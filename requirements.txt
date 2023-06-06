@@ -1,0 +1,23 @@
+jupyterlab==4.0.0
+jupyterlab-scenes==2.0.0 
+ipywidgets==8.0.6
+nest-asyncio==1.5.6 
+--find-links https://download.pytorch.org/whl/torch_stable.html
+torch==2.0.0+cu118
+torchaudio==2.0.1+cu118 
+torchvision==0.15.1+cu118
+clip @ git+https://github.com/openai/CLIP.git@a9b1bf5920416aaeaec965c25dd9e8f98c864f16
+diffusers==0.16.1 
+accelerate==0.19.0
+transformers==4.29.2 
+safetensors==0.3.1
+matplotlib==3.7.1
+omegaconf==2.3.0
+sentencepiece==0.1.99
+protobuf==3.20.0
+scikit-image==0.20.0
+huggingface-hub==0.14.1
+patch-ng==1.17.4
+easysettings==4.0.1
+xonsh==0.14.0
+pyperclip==1.8.2

@@ -1,0 +1,15 @@
+/.idea
+*.iml
+/bin
+__pycache__
+.ipynb_checkpoints
+/modules/iflab/pipelines/experimental
+/sync.cmd
+/home/*
+!/home/.jupyter
+/home/.jupyter/*
+!/home/.jupyter/lab
+/venv
+/user-notebook-dev.cmd
+/notebooks/outputs
+/patches/deepfloyd_if-mod2.patch

@@ -1,0 +1,51 @@
+diff -ru huggingface_hub/file_download.py huggingface_hub_mod/file_download.py
+--- huggingface_hub/file_download.py	2023-04-25 14:35:30.000000000 +0400
++++ huggingface_hub_mod/file_download.py	2023-05-27 20:21:35.418983400 +0400
+@@ -1100,14 +1100,16 @@
+ 
+     </Tip>
+     """
++    repo_id = repo_id.replace("\\", "/")
++
+     if force_filename is not None:
+-        warnings.warn(
+-            (
+-                "The `force_filename` parameter is deprecated as a new caching system, "
+-                "which keeps the filenames as they are on the Hub, is now in place."
+-            ),
+-            FutureWarning,
+-        )
++#        warnings.warn(
++#            (
++#                "The `force_filename` parameter is deprecated as a new caching system, "
++#                "which keeps the filenames as they are on the Hub, is now in place."
++#            ),
++#            FutureWarning,
++#        )
+         legacy_cache_layout = True
+ 
+     if legacy_cache_layout:
+diff -ru huggingface_hub/hf_api.py huggingface_hub_mod/hf_api.py
+--- huggingface_hub/hf_api.py	2023-04-25 14:35:30.000000000 +0400
++++ huggingface_hub_mod/hf_api.py	2023-05-27 20:22:38.216454000 +0400
+@@ -1589,6 +1589,8 @@
+ 
+         </Tip>
+         """
++        repo_id = repo_id.replace("\\", "/")
++
+         headers = self._build_hf_headers(token=token)
+         path = (
+             f"{self.endpoint}/api/models/{repo_id}"
+diff -ru huggingface_hub/utils/_validators.py huggingface_hub_mod/utils/_validators.py
+--- huggingface_hub/utils/_validators.py	2023-04-25 14:35:30.000000000 +0400
++++ huggingface_hub_mod/utils/_validators.py	2023-05-27 20:08:01.847356500 +0400
+@@ -24,7 +24,7 @@
+ REPO_ID_REGEX = re.compile(
+     r"""
+     ^
+-    (\b[\w\-.]+\b/)? # optional namespace (username or organization)
++    (\b[\w\-.]+\b(/|\\))? # optional namespace (username or organization)
+     \b               # starts with a word boundary
+     [\w\-.]{1,96}    # repo_name: alphanumeric + . _ -
+     \b               # ends with a word boundary
