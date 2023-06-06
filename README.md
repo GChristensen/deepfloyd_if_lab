@@ -62,7 +62,7 @@ The installation may take around an hour with an average internet connection and
 >Q: It prints error messages several screens long. Is it normal?
 
 A: Absolutely. DeepFloyd IF is an experimental library without a detailed user manual,
-and you running it in Jupyter notebooks.
+and you are running it in Jupyter notebooks.
 
 >Q: It does not work, freezes, or crashes not displaying an error message. What this might be?
 
