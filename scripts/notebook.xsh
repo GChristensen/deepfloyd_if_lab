@@ -49,7 +49,7 @@ if args.auto_update and not args.skip_update:
         remote_version = release["tag_name"]
 
     if args.force_update or remote_version != installed_version:
-        libpath = site.getsitepackages()[0]
+        libpath = next(filter(lambda s: "packages" in s, site.getsitepackages()), "")
         $TMPDIR = $HOME + "/tmp"
         $[mkdir $TMPDIR]
         $[git pull origin main]
