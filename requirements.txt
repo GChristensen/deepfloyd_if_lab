@@ -21,3 +21,4 @@ patch-ng==1.17.4
 easysettings==4.0.1
 xonsh==0.14.0
 pyperclip==1.8.2
+pyadl==0.1

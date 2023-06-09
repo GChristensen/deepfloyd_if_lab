@@ -8,12 +8,6 @@ git init
 git remote add origin https://github.com/GChristensen/deepfloyd_if_lab.git
 git pull origin main
 attrib +h notebooks/deepfloyd-if-lab-dev.ipynb
+attrib +h open-notebook-dev.cmd
 
-python -m venv venv
-python -m pip install --upgrade pip
-call venv\scripts\activate
-pip install "xonsh[full]"
-
-start open-notebook --force-update
-
-exit
+call open-notebook --force-update

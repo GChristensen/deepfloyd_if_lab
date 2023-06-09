@@ -17,9 +17,9 @@ Advanced notebook-based web UI for [DeepFloyd IF](https://github.com/deep-floyd/
 
 ## Minimum System Requirements
 
-* 24 GB of system RAM.
-* 16 GB (for the stage II only) or 24 GB (for the stage III) of VRAM.
-* 50 GB of disk space.
+* 24GB of system RAM.
+* 8-12GB of VRAM (24GB is recommended).
+* 50GB of disk space.
 
 ## Installation 
 
@@ -47,6 +47,25 @@ The installation may take around an hour with an average internet connection and
    Launch the script and wait until the browser window with the notebook opens. It may be necessary to open it manually
    at http://localhost:18888/lab and manually launch the first notebook cell if it does not run automatically.
 
+## Peak VRAM Usage
+
+Peak DeepFloyd IF Lab GPU memory usage for different sets of models, ±1GB.
+
+| Model set                | Stage produced | Non-optimized | Alternate load¹ |
+|--------------------------|----------------|---------------|----------------|
+| IF-I-XL + IF-II-L        | Stage II       | 16GB          | NA             |  
+| IF-I-XL + IF-II-L + SDx4² | Stage III      | 22GB          | 12GB           |           
+| IF-I-L + IF-II-L         | Stage II       | 9GB           | NA             |
+|  IF-I-L + IF-II-L + SDx4 | Stage III      | 12GB          | 12GB           |
+| IF-I-L + IF-II-M         | Stage II       | 7GB           | NA             |
+| IF-I-L + IF-II-M + SDx4³  | Stage III      | 12GB          | 11GB           |
+| IF-I-M + IF-II-M         | Stage II       | 7GB           | NA             |             
+| IF-I-M + IF-II-M + SDx4  | Stage III      | 12GB          | 11GB           |
+
+¹ The alternate load optimization is enabled automatically for GPUs with <24GB of VRAM.<br>
+² The IF-I-XL + IF-II-L + SDx4 model set is used by default on GPUs with ≥12GB of VRAM.<br>
+³ The IF-I-L + IF-II-M + SDx4 model set is used by default on GPUs with <12GB of VRAM.
+
 ## Screenshots
 | Dream | Style Transfer |
 |---|---|
@@ -56,6 +75,9 @@ The installation may take around an hour with an average internet connection and
 |------------|------------------|
 |<a target="_blank" align="left" href="https://user-images.githubusercontent.com/170405/243439342-8ac57d06-aa46-4214-b4eb-3ba8150d339a.png"><img src="https://user-images.githubusercontent.com/170405/243440219-65eaf5fa-6a37-49e4-b82d-a0b57ad69ba9.png"></a>|<a target="_blank" href="https://user-images.githubusercontent.com/170405/243439353-c07ed02f-044e-4275-a255-50fe2ee29968.png"><img src="https://user-images.githubusercontent.com/170405/243440229-979f0d35-1001-46b3-9715-a4253e7d1a31.png"></a>|
 
+## Changelog
+
+The changelog could be found [here](https://github.com/GChristensen/deepfloyd_if_lab/wiki/Changelog).
 
 ## Frequently Asked Questions
 
@@ -64,7 +86,7 @@ The installation may take around an hour with an average internet connection and
 A: Absolutely. DeepFloyd IF is an experimental library without a detailed user manual,
 and you are running it in Jupyter notebooks.
 
->Q: It does not work, freezes, or crashes not displaying an error message. What this might be?
+>Q: It does not work, freezes, or crashes not displaying an error message. Are there any chances to make it work?
 
 A: This may be anything, ranging from bugs to hardware incompatibility.
 Unfortunately, you are out of luck, because it is impossible to determine what it is exactly.
@@ -73,31 +95,46 @@ Unfortunately, you are out of luck, because it is impossible to determine what i
 
 A: Please try to restart the Jupyter Python kernel or the application.
 
->Q: Will this UI ever work with 12 GB VRAM?
+>Q: It does not work even after I have restarted the application. What should I do next?
 
-A: No. Please do not try to run it with 12 GB VRAM as is.
+A: Please delete the `home/settings.json` file or, if this does not help, the entire `venv` folder.
+
+>Q: I have enough VRAM, but encounter memory errors. Do I need a system upgrade?
+
+A: Probably. But it is also worth trying to close all unneeded applications, because there may be just not enough free
+system RAM. DeepFloyd IF pushes your machine to its limits, and you need as much free RAM and VRAM as possible.
+
+>Q: Can I run this UI on a 8GB GPU?
+
+A: Currently it should be only possible to upscale to stage II with IF-I-L + IF-II-M models on a 8GB GPU.
+
+>Q: The generation stucks on the message "Generating T5 embeddings..." Is my machine incapable running DeepFloyd IF?
+
+Your CPU may not be able to process bfloat16 (the default datatype used by T5 encoder) well enough. Currently, the
+only alternative is to add `--t5-dtype float32` command line argument in the `open-notebook` script. 
+Its use may require at least 32GB of system RAM.
 
 >Q: My generations look like halftone prints that were shredded and glued back by the pieces. How can I improve them?
 
-A: Please check the guidance level. It might be too high. As the last resort, there is an option to not pass the
-prompt to the stage III. It is also possible to upscale the results of stage II using different upscaler.
+A: Please check the guidance level. It might be too high. As a last resort, there is an option to not pass the
+prompt to stage III. It is also possible to upscale the results of stage II using different upscaler.
 
 >Q: Despite all my efforts, when doing inpainting I can't reproduce the effect of disappearing hat demonstrated
 > at DeepFloyd IF GitHub page. I always get a static image and it looks blurry. Is there a way to improve this?
 
 A: The [official demonstration](https://github.com/deep-floyd/IF#iv-zero-shot-inpainting) of DeepFloyd IF inpainting 
 is quite misleading. Inpainting always produces a static image, and it looks blurry because this is how DeepFloyd IF
-pipeline works. It reduces the source image to 64x64 pixels, inpaints there, and tries to upscale it back. 
-Probably there are bugs, or currently we do not know something that will allow to obtain the same quality,
+pipeline works. It reduces the source image to 64x64 pixels, inpaints there, and upscales it back. 
+Probably there are bugs, or currently, we do not know something that will allow us to obtain the same quality,
 as it was demonstrated. 
 
 >Q: How do I create an inpainting mask?
 
 A: Currently, DeepFloyd IF Lab has no ability to interactively create a mask just by painting on the source image.
-It is necessary to upload a black and white mask image along with the source image. It is possible
-to create the mask image by painting over the source image on a separate layer in your favorite graphical editor, 
-or by directly transforming the current selection into a black and white image. 
-Some editors have the macro system that allows to perform such operations in a single keystroke. Please refer to your 
+It is necessary to upload a black-and-white mask image along with the source image. It is possible
+to create a mask image by painting over the source image on a separate layer in your favorite graphical editor, 
+or by directly transforming the current selection/alpha channel into the corresponding black-and-white image. 
+Some editors have a macro system that allows to perform such operations in a single keystroke. Please refer to your 
 editor user manual.
 
 >Q: What are the advanced options for?
@@ -106,24 +143,24 @@ A: The advanced options allow to pass any supported argument values to the corre
 For example, if you need to set aug_level to 0.2, specify aug_level=0.2 in one of these fields. The arguments are separated by commas.
 
 >Q: I want to generate pretty anime girls with big cat ears using DeepFloyd IF, applying different character LoRAs.
-How long I need to wait until this functionality becomes available?
+How long do I need to wait until this functionality becomes available?
 
 A: At first, it is necessary to wait until [A100s](https://en.wikipedia.org/wiki/Ampere_(microarchitecture)) will be 
-available for $100/unit in used hardware stores, so anyone can get about 20 of them to create LoRAs for DeepFloyd IF. 
+available for $100/unit in used hardware stores, so anyone can get about a dozen of them to create LoRAs for DeepFloyd IF. 
 
 Then someone should prepare a dataset of several millions of high-quality reasonably-labeled anime images without
-problems with copyright and the availability of such content. What is the rest is to train an anime base model that is not 
+problems with copyright and the availability of such content. The rest is to train an anime base model that is not 
 overfitted and does things just right. Assuming that this model should be available free of charge, it is pretty
 easy to estimate the time needed to wait for its general availability.
 
->Q: I want a feature X, REST API and a plug-in system. Will they be implemented?
+>Q: I want a feature X, REST API, and a plug-in system. Will they be implemented?
 
 A: Probably, I would be able to work on this if I get enough donations to buy a new laptop with 128 GB of RAM and RTX 4090.
-This may not happen the next 10000 years.
+This may not happen in the next 10000 years.
 
 >Q: For educational purposes only, I need to generate images of routine alien reproductive activity with AZC/BZC-chromosome
-> alien individuals placed by the sides and CZC-chromosome individuals in between. I think, it might be possible with the
-> superior DeepFloyd IF linguistic abilities. Can you tell me how to use DeepFloyd IF for this?
+> alien individuals placed by the sides and CZC-chromosome individuals in between. Is it possible, given 
+> the superior linguistic abilities of DeepFloyd IF? Can you tell me how to use it for this?
 
 A: Unfortunately, it is not possible. DeepFloyd IF was trained with some lacunas in the knowledge of such topics. Moreover, it has
 a built-in safety filter that sometimes blurs random images which it considers too hot or hateful.
@@ -135,7 +172,7 @@ A: This repository does not contain executable code derived from DeepFloyd IF an
 It is licensed under BSD. Please remember that you may use DeepFloyd IF 1.0 only for personal research 
 purposes due to its own license.
 
->Q: Wow! Your WebUI boosts my generation productivity fivefold. I know how it is hard to build
+>Q: Wow! Your WebUI boosts my productivity fivefold. I know how it is hard to build
 > software, and how much time is required to maintain it. Where I can send you some GWEI for thanks?
 
 A: It is <a href="https://link.depay.com/AXgtLB6v1Iqx1Ufmnh7Hf">here</a>. Thank you.

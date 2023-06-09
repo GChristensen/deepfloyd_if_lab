@@ -12,10 +12,12 @@ class SettingsUI():
 
         models_label = widgets.Label(" Models (requires kernel restart)",
                                      style=dict(background="var(--jp-layout-color2)"))
+
         self.stageI_model_dropdown = widgets.Dropdown(
-            options=['IF-I-XL', 'IF-I-L', 'IF-I-M'],
-            value='IF-I-XL',
+            options=['IF-I-XL-v1.0', 'IF-I-L-v1.0', 'IF-I-M-v1.0'],
+            value='IF-I-XL-v1.0',
             description='Stage I: ',
+            style= {'description_width': 'max-content'},
             disabled=False,
         )
         self.stageI_model_dropdown.observe(self.on_settings_changed, 'value', type='change')
@@ -23,9 +25,10 @@ class SettingsUI():
         self.stageI_model_dropdown.value = settings.get(self.stageI_model_dropdown.__setting,
                                                         self.stageI_model_dropdown.options[0])
         self.stageII_model_dropdown = widgets.Dropdown(
-            options=['IF-II-L', 'IF-II-M'],
-            value='IF-II-L',
+            options=['IF-II-L-v1.0', 'IF-II-M-v1.0'],
+            value='IF-II-L-v1.0',
             description='Stage II: ',
+            style= {'description_width': 'max-content'},
             disabled=False,
         )
         self.stageII_model_dropdown.observe(self.on_settings_changed, 'value', type='change')
@@ -33,15 +36,23 @@ class SettingsUI():
         self.stageII_model_dropdown.value = settings.get(self.stageII_model_dropdown.__setting,
                                                          self.stageII_model_dropdown.options[0])
         self.stageIII_model_dropdown = widgets.Dropdown(
-            options=['stable-diffusion-x4-upscaler', 'IF-III-L'],
+            options=['stable-diffusion-x4-upscaler', 'IF-III-L-v1.0'],
             value='stable-diffusion-x4-upscaler',
             description='Stage III: ',
+            style= {'description_width': 'max-content'},
             disabled=False,
         )
         self.stageIII_model_dropdown.observe(self.on_settings_changed, 'value', type='change')
         self.stageIII_model_dropdown.__setting = "stageIII_model"
         self.stageIII_model_dropdown.value = settings.get(self.stageIII_model_dropdown.__setting,
                                                           self.stageIII_model_dropdown.options[0])
+
+        self.alternate_load_check = widgets.Checkbox(
+            description="Alternate load"
+        )
+        self.alternate_load_check.observe(self.on_settings_changed, 'value', type='change')
+        self.alternate_load_check.__setting = "alternate_load"
+        self.alternate_load_check.value = settings.get(self.alternate_load_check.__setting, False)
 
         generation_label = widgets.Label(" Generation",
                                          style=dict(background="var(--jp-layout-color2)"))
@@ -62,8 +73,10 @@ class SettingsUI():
         self.remember_ui_state_check.__setting = "remember_ui_state"
         self.remember_ui_state_check.value = settings.get(self.remember_ui_state_check.__setting, False)
 
-        self.root_box = VBox([models_label, self.stageI_model_dropdown, self.stageII_model_dropdown,
+        self.root_box = VBox([models_label,
+                              self.stageI_model_dropdown, self.stageII_model_dropdown,
                               self.stageIII_model_dropdown,
+                              self.alternate_load_check,
                               generation_label,
                               self.disable_watermark_check,
                               ui_label,
@@ -84,9 +97,14 @@ class SettingsUI():
         key = e.owner.__setting
         value = e["new"]
 
+        self.setting_action(key, value)
+
         settings[key] = value
         settings.save()
         self.notify_uis()
+
+    def setting_action(self, key, value):
+        pass
 
     def settings_changed(self, e):
         pass

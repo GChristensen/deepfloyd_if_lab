@@ -1,4 +1,5 @@
 import numpy as np
+from PIL import Image
 
 from deepfloyd_if.pipelines import inpainting
 from deepfloyd_if.pipelines.utils import _prepare_pil_image
@@ -33,12 +34,21 @@ class InpaintingPipeline(Pipeline):
         if hasattr(args["if_I_kwargs"], 'style_t5_embs'):
             del args["if_I_kwargs"]['style_t5_embs']
 
-        args["support_pil_img"] = self.support_image
-        inpainting_mask = np.array(self.mask_image)
-        inpainting_mask = np.moveaxis(inpainting_mask, -1, 0)
-        args['inpainting_mask'] = inpainting_mask
+        if self.support_image:
+            args["support_pil_img"] = self.support_image
 
-        args["if_I_kwargs"].low_res = _prepare_pil_image(self.support_image, 64)
-        args["if_I_kwargs"].mid_res = _prepare_pil_image(self.support_image, 256)
-        args["if_I_kwargs"].high_res = _prepare_pil_image(self.support_image, 1024)
+            inpainting_mask = None
+            if self.mask_image:
+                inpainting_mask = np.array(self.mask_image)
+            else:
+                blank_pil_image = Image.new('RGB', self.support_image.size, (255, 255, 255))
+                inpainting_mask = np.array(blank_pil_image)
+
+            inpainting_mask = np.moveaxis(inpainting_mask, -1, 0)
+
+            args['inpainting_mask'] = inpainting_mask
+
+            args["if_I_kwargs"].low_res = _prepare_pil_image(self.support_image, 64)
+            args["if_I_kwargs"].mid_res = _prepare_pil_image(self.support_image, 256)
+            args["if_I_kwargs"].high_res = _prepare_pil_image(self.support_image, 1024)
 

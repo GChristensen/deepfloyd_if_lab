@@ -19,9 +19,7 @@ from PIL.PngImagePlugin import PngInfo
 from PIL import Image, ImageGrab
 
 from ..const import DEBUG, RESPACING_MODES, UI_THREADS, DEBUG_PROMPT
-
-RE_CUSTOM_PARAMETER = r"'([^']+)': ([^,]+)"
-
+from ..pipelines.stages import ModelError
 
 def catch_handler_errors(method):
     @wraps(method)
@@ -44,9 +42,15 @@ class PipelineUI(ABC):
         self.STAGE_I_SCALE = 2.5
         self.STOP_BUTTON_LABEL = "Stop"
         self.SERIES_BUTTON_LABEL = "Batch Stage I"
+        self.UPSCALE_BUTTON_LABEL = "🔬Upscale"
 
         self.settings = {}
         self.pipeline = pipeline
+
+        if self.pipeline:
+            self.pipeline.on_before_generation = self.on_before_generation
+            self.pipeline.on_before_upscale = self.on_before_upscale
+
         self.generation_thread = None
 
         self.upscaleII = []
@@ -55,6 +59,7 @@ class PipelineUI(ABC):
         self.upscaling_stage = None
         self.upscaling_progress_thread = None
         self.upscaling_progress_event = None
+        self.stop_upscale = False
 
         self.save_ui_state = lambda k, s: None
         self.load_ui_state = lambda k: None
@@ -236,7 +241,7 @@ class PipelineUI(ABC):
         )
         self.clear_results_button.on_click(self.clear_results)
         self.upscale_button = widgets.Button(
-            description='🔬Upscale',
+            description=self.UPSCALE_BUTTON_LABEL,
             tooltip='Upscale the selected stage I images'
         )
         self.upscale_button.on_click(self.on_upscale_click)
@@ -325,8 +330,11 @@ class PipelineUI(ABC):
         )
         self.paste_mask_img_button.on_click(self.paste_mask_image)
 
-        self.support_img_view = widgets.Image(layout=Layout(width="max-content", max_width="50%", display="none"))
-        self.mask_img_view = widgets.Image(layout=Layout(width="50%", max_width="50%", display="none"))
+        self.support_img_view = widgets.Image(layout=Layout(width="max-content", height="max-content", max_width="100%", display="none"))
+        self.mask_img_view = widgets.Image(layout=Layout(width="max-content", height="max-content", max_width="95%", display="none"))
+
+        self.support_image_box = HBox([self.support_img_view], layout=Layout(width="50%"))
+        self.mask_image_box = HBox([self.mask_img_view], layout=Layout(width="50%"))
 
         self.images_box = VBox([
                                     HBox([
@@ -337,8 +345,8 @@ class PipelineUI(ABC):
                                               self.paste_mask_img_button],
                                              layout=Layout(width="50%"))
                                     ]),
-                                    HBox([HBox([self.support_img_view], layout=Layout(width="50%")),
-                                          HBox([self.mask_img_view], layout=Layout(width="50%"))])
+                                    HBox([self.support_image_box,
+                                          self.mask_image_box])
                                 ], layout=Layout(width="100%"))
 
         self.result_box = HBox([], layout=Layout(width="100%", margin="20px 0", flex_flow="row wrap", display="none"))
@@ -369,6 +377,13 @@ class PipelineUI(ABC):
         d = datetime.fromtimestamp(t)
         return d.strftime("%Y%m%d_%H%M%S")
 
+    def status_message(self, text):
+        self.status_box.children = [widgets.Label(text)]
+
+    def show_progress_bar(self):
+        self.progress_bar.value = 0
+        self.status_box.children = [self.progress_bar]
+
     def is_prompt_valid(self):
         return self.prompt_text.value or self.negative_prompt_text.value or self.style_prompt_text.value
 
@@ -389,6 +404,13 @@ class PipelineUI(ABC):
         self.stageII_custom_params_text.value = parameters.get("if_II_kwargs", "") or ""
         self.stageIII_custom_params_text.value = parameters.get("if_III_kwargs", "") or ""
         self.sIII_pass_prompt_check.value = parameters.get("pass_prompt_to_stage_III", True)
+
+        self.mask_image_box.children = [widgets.HTML(f"""
+            Stage: {parameters.get("stage", "")}<br>
+            Stage I model: {parameters.get("stageI_model", "")}<br>
+            Stage II model: {parameters.get("stageII_model", "")}<br>
+            Stage III model: {parameters.get("stageIII_model", "")}<br>
+        """)]
 
     def set_seed_value(self, seed):
         self.seed_number.value = seed
@@ -575,7 +597,7 @@ class PipelineUI(ABC):
 
     def compute_embeddings(self):
         if not self.is_prompt_valid():
-            self.status_box.children = [widgets.Label("Please provide a prompt")]
+            self.status_message("Please provide a prompt")
 
         prompt = self.prompt_text.value or None
         negative_prompt = self.negative_prompt_text.value or None
@@ -586,13 +608,13 @@ class PipelineUI(ABC):
         update_style = style_prompt != self.pipeline.style_prompt
 
         if update_prompt or update_negative or update_style:
-            self.status_box.children = [widgets.Label("Computing T5 Embeddings")]
+            self.status_message("Computing T5 Embeddings...")
             self.pipeline.prompt = prompt
             self.pipeline.negative_prompt = negative_prompt
             self.pipeline.style_prompt = style_prompt
             self.pipeline.compute_t5_embs(update_prompt, update_negative, update_style)
             self.output.clear_output()
-            self.status_box.children = [self.progress_bar]
+            self.show_progress_bar()
 
     @catch_handler_errors
     def on_generate_click(self, button):
@@ -614,27 +636,31 @@ class PipelineUI(ABC):
 
     @catch_handler_errors
     def on_generate_series_click(self, button):
-     with self.output:
-         if button.description == self.STOP_BUTTON_LABEL:
-             button.description = self.SERIES_BUTTON_LABEL
-             self.pipeline.stop_generation()
-         elif self.generation_thread is None:
-             button.description = self.STOP_BUTTON_LABEL
-             self.persist_ui_state()
-             self.reset_result()
-             self.setup_pipeline()
-             self.compute_embeddings()
+        with self.output:
+            if button.description == self.STOP_BUTTON_LABEL:
+                button.description = self.SERIES_BUTTON_LABEL
+                self.pipeline.stop_generation()
+            elif self.generation_thread is None:
+                button.description = self.STOP_BUTTON_LABEL
+                self.persist_ui_state()
+                self.reset_result()
+                self.setup_pipeline()
+                self.compute_embeddings()
 
-             if UI_THREADS:
-                 self.generation_thread = Thread(target=lambda: self.generate_series(button=button))
-                 self.generation_thread.start()
-             else:
-                 self.generate_series(button=button)
+                if UI_THREADS:
+                    self.generation_thread = Thread(target=lambda: self.generate_series(button=button))
+                    self.generation_thread.start()
+                else:
+                    self.generate_series(button=button)
 
     @catch_handler_errors
     def on_upscale_click(self, button):
-        if self.generation_thread is None:
-            with self.output:
+        with self.output:
+            if button.description == self.STOP_BUTTON_LABEL:
+                button.description = self.UPSCALE_BUTTON_LABEL
+                self.stop_upscale = True
+            elif self.generation_thread is None:
+                button.description = self.STOP_BUTTON_LABEL
                 self.persist_ui_state()
                 self.setup_pipeline()
                 self.compute_embeddings()
@@ -645,27 +671,41 @@ class PipelineUI(ABC):
                 else:
                     self.generate_upscales()
 
+    def on_before_generation(self):
+        if self.pipeline.is_optimized and not self.pipeline.has_stageI_loaded:
+            self.status_message("Loading stage I model...")
+
     @catch_handler_errors
     def generate_series(self, button=None, seed=None, steps=None, single=False):
         try:
             self.upscaling = False
-            self.pipeline.generate_series(steps=steps, seed=seed, callback=self.process_stageI_result, progress=self.update_progress)
+            self.pipeline.generate_series(steps=steps, seed=seed, callback=self.process_stageI_result,
+                                          progress=self.update_progress)
             self.reset_progress()
+        except ModelError as e:
+            self.status_message(str(e))
+        except MemoryError as e:
+            self.status_message("Memory error. Please restart the kernel.")
         finally:
             self.generation_thread = None
             if not single:
                 button.description = self.SERIES_BUTTON_LABEL
 
     def update_progress(self, n, p):
-        if len(self.status_box.children) and self.status_box.children[0] is not self.progress_bar:
-            self.status_box.children = [self.progress_bar]
+        try:
+            if len(self.status_box.children) and self.status_box.children[0] is not self.progress_bar:
+                self.show_progress_bar()
 
-        self.progress_bar.max = n - 1
-        self.progress_bar.value = n - 1 - p
+            self.progress_bar.max = n - 1
+            self.progress_bar.value = n - 1 - p
 
-        if self.upscaling and self.upscaling_stage == "III" and p == 0:
-            self.upscaling_progress_event = threading.Event()
-            self.upscaling_progress_thread = Thread(target=self.stageIII_mock_progress).start()
+            if self.upscaling and self.upscaling_stage == "III" and p == 0:
+                self.upscaling_progress_event = threading.Event()
+                self.upscaling_progress_thread = Thread(target=self.stageIII_mock_progress).start()
+            elif self.upscaling_progress_event and self.upscaling_stage != "III" and p == n - 1:
+                self.upscaling_progress_event.set()
+        except:
+            pass
 
     def reset_progress(self):
         self.progress_bar.value = 0
@@ -747,7 +787,7 @@ class PipelineUI(ABC):
 
         duration = round(result.duration, 1)
         its = round(result.iterations, 1)
-        self.status_box.children = [widgets.Label(f"Stage I: {duration}s")]
+        self.status_message(f"Stage I: {duration}s")
 
     def add_upscaleII(self, e, seed):
         if e["name"] == "value" and e["new"]:
@@ -761,6 +801,10 @@ class PipelineUI(ABC):
         elif e["name"] == "value" and not e["new"]:
             self.upscaleIII.remove(seed)
 
+    def on_before_upscale(self):
+        if self.pipeline.is_optimized and (not self.pipeline.has_stageII_loaded or not self.pipeline.has_stageIII_loaded):
+            self.status_message("Loading stage II-III models...")
+
     @catch_handler_errors
     def generate_upscales(self):
         try:
@@ -772,14 +816,23 @@ class PipelineUI(ABC):
             for r in self.upscaleIII:
                 upscales[r] = "III"
 
+            self.stop_upscale = False
             for (r, s) in upscales.items():
+                if self.stop_upscale:
+                    break
                 self.generate_upscale(r, s)
+
+        except ModelError as e:
+            self.status_message(str(e))
+        except MemoryError as e:
+            self.status_message("Memory error, please restart.")
         finally:
             self.generation_thread = None
 
     def generate_upscale(self, seed, stage):
         with self.output:
             self.upscaling_stage = stage
+
             result = self.pipeline.upscale(seed, stage=stage, progress=self.update_progress)
             if self.upscaling_progress_event:
                 self.upscaling_progress_event.set()
@@ -792,7 +845,7 @@ class PipelineUI(ABC):
 
             duration = round(result.duration, 1)
             label = "Stage II" if stage == "II" else "Stages II-III"
-            self.status_box.children = [widgets.Label(f"{label}: {duration}s")]
+            self.status_message(f"{label}: {duration}s")
 
     def process_upscale_result(self, seed, result, stage):
         image = result.images[stage][0]
@@ -820,13 +873,17 @@ class PipelineUI(ABC):
         self.upscale_results_label.layout.visibility = "visible"
         self.upscale_box.children += (result_box,)
 
+    # a deeper patching is required to hook into the stage III progress, so here is a mock now
     def stageIII_mock_progress(self):
         self.progress_bar.max = self.pipeline.iterationsIII - 1
 
         for i in range(0, self.pipeline.iterationsIII):
             self.progress_bar.value = i
             if self.upscaling_progress_event.wait(.22):
+                self.upscaling_progress_event = None
                 break
+
+        self.status_message("Processing...")
 
     def clear_results(self, button):
         self.pipeline.reset_generations()
@@ -850,6 +907,9 @@ class PipelineUI(ABC):
 
     def settings_changed(self, new_settings):
         self.settings = new_settings
+
+        if self.pipeline:
+            self.pipeline.stages.alternate_load = self.settings.get("alternate_load", False)
 
     class GeneratorFacade:
         def __init__(self, ui, options):

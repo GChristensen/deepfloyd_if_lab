@@ -1,4 +1,3 @@
-from IPython.core.display_functions import display
 from deepfloyd_if.pipelines import style_transfer
 from deepfloyd_if.pipelines.utils import _prepare_pil_image
 

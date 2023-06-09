@@ -30,6 +30,8 @@ class SuperResolutionPipeline(Pipeline):
             return super_resolution(**kwargs)
 
     def generate(self, seed=None, progress=True, reference=False):
+        self.prepare_upscale("III")
+
         if seed is None:
             seed = self.generate_seed()
 

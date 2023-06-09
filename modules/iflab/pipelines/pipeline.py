@@ -9,6 +9,8 @@ from datetime import datetime
 from random import randint
 
 import numpy as np
+from .stages import ModelError
+
 
 @dataclass
 class IFResult:
@@ -65,6 +67,9 @@ class Pipeline(ABC):
         self.mask_image = None
         self.disable_watermark = False
         self.pass_prompt_to_stage_III = None
+
+        self.on_before_generation = lambda: None
+        self.on_before_upscale = lambda: None
 
         try:
             self.experimental = importlib.import_module('.'.join(__name__.split('.')[:-1]) + ".experimental")
@@ -127,7 +132,34 @@ class Pipeline(ABC):
             for k, v in params.items():
                 stage_args[k] = v
 
+    @property
+    def is_optimized(self):
+        return self.stages.alternate_load
+
+    @property
+    def has_stageI_loaded(self):
+        return self.stages.has_stageI()
+
+    @property
+    def has_stageII_loaded(self):
+        return self.stages.has_stageII()
+
+    @property
+    def has_stageIII_loaded(self):
+        return self.stages.has_stageIII()
+
+    def prepare_generation(self):
+        self.on_before_generation()
+        self.stages.free_stageII(False)
+        self.stages.free_stageIII()
+        self.stages.ensure_stageI()
+
+        if not self.has_stageI_loaded:
+            raise ModelError("Error loading stage I model.")
+
     def generate(self, seed=None, progress=True, reference=False):
+        self.prepare_generation()
+
         if seed is None:
             seed = self.generate_seed()
 
@@ -193,7 +225,24 @@ class Pipeline(ABC):
             if callback is not None:
                 callback(result)
 
+    def prepare_upscale(self, stage):
+        self.on_before_upscale()
+        self.stages.free_stageI()
+
+        self.stages.ensure_stageII()
+
+        if not self.has_stageII_loaded:
+            raise ModelError("Error loading stage II model.")
+
+        if stage == "III":
+            self.stages.ensure_stageIII()
+
+            if not self.has_stageIII_loaded:
+                raise ModelError("Error loading stage III model.")
+
     def upscale(self, seed=None, stage="II", progress=False, reference=False):
+        self.prepare_upscale(stage)
+
         resultI = self.result_stageI if seed is None else self.generationsI[seed]
 
         if_II_kwargs = UserDict({
@@ -248,6 +297,7 @@ class Pipeline(ABC):
         images, tensors = self.result_upscale
         output = images.get("output", [[]])
         self.result_upscale = IFResult(images, tensors, output, resultI.args, resultI.seed, resultI.time, 0, duration)
+
         return self.result_upscale
 
     @abstractmethod

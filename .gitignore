@@ -5,6 +5,7 @@ __pycache__
 .ipynb_checkpoints
 /modules/iflab/pipelines/experimental
 /sync.cmd
+/mkdiff.cmd
 /home/*
 !/home/.jupyter
 /home/.jupyter/*
