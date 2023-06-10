@@ -825,9 +825,10 @@ class PipelineUI(ABC):
         except ModelError as e:
             self.status_message(str(e))
         except MemoryError as e:
-            self.status_message("Memory error, please restart.")
+            self.status_message("Memory error. Please restart the kernel.")
         finally:
             self.generation_thread = None
+            self.upscale_button.description = self.UPSCALE_BUTTON_LABEL
 
     def generate_upscale(self, seed, stage):
         with self.output:
