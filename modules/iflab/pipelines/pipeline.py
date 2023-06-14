@@ -112,14 +112,14 @@ class Pipeline(ABC):
         if update_negative:
             if self.negative_prompt is not None:
                 promptv = [self.negative_prompt] * self.count
-                self.t5_embs = self.stages.t5.get_text_embeddings(promptv)
+                self.negative_t5_embs = self.stages.t5.get_text_embeddings(promptv)
             else:
                 self.negative_t5_embs = None
 
         if update_style:
             if self.style_prompt is not None:
                 promptv = [self.style_prompt] * self.count
-                self.t5_embs = self.stages.t5.get_text_embeddings(promptv)
+                self.style_t5_embs = self.stages.t5.get_text_embeddings(promptv)
             else:
                 self.style_t5_embs = None
 

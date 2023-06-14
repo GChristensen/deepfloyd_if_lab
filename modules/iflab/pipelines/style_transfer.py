@@ -32,9 +32,3 @@ class StylePipeline(Pipeline):
         # TODO: move support images to the class level in all pipelines for optimization
         args["if_I_kwargs"].low_res = _prepare_pil_image(self.support_image, 64)
         args["if_I_kwargs"].mid_res = _prepare_pil_image(self.support_image, 256)
-
-    def upscale(self, **kwargs):
-        if self.stages.sequential_load != SEQ_LOAD_OFF:
-            raise ModelError("Upscale is implemented only for I+II+III")
-        else:
-            return super().upscale(**kwargs)

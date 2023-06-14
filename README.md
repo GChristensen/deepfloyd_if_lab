@@ -108,8 +108,7 @@ recommended requirements allow to achieve more or less seamless experience.
 >Q: Can I run this UI on a 8GB GPU?
 
 A: The UI may run on a 8GB GPUs with 12GB of system RAM and the swap of the same size, but it may require constant restarts
-due to the insufficient memory. DeepFloyd IF is designed for 24GB of VRAM. 
-Some UI features, such as style transfer, are implemented only for GPUs with 24GB of video memory.
+due to the insufficient memory.
 
 >Q: My generations look like halftone prints that were shredded and glued back by the pieces. How can I improve them?
 
