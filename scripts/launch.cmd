@@ -1,7 +1,8 @@
 cd %~dp0/..
-set IFLAB_HOME=%cd%
-set path=%IFLAB_HOME%/bin/git/cmd;%IFLAB_HOME%/venv/Scripts;%IFLAB_HOME%/bin/python;%path%
-set PYTHONPATH=%IFLAB_HOME%/modules
+@set IFLAB_HOME=%cd%
+@set PATH=%IFLAB_HOME%/bin/git/cmd;%IFLAB_HOME%/venv/Scripts;%IFLAB_HOME%/bin/python;%PATH%
+@set PIP_CACHE_DIR=%IFLAB_HOME%/home/pip/cache
+@set PYTHONPATH=%IFLAB_HOME%/modules
 
 @if exist venv\ goto HASVENV
 
@@ -16,4 +17,5 @@ set IFLAB_FORCE_UPDATE=1
 
 call .\venv\scripts\activate
 
-xonsh scripts/notebook.xsh %* %COMMANDLINE_ARGS%
+xonsh scripts/update.xsh %*
+xonsh scripts/notebook.xsh %*

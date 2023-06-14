@@ -68,7 +68,7 @@ class DeepFloydIFUI:
             self.tabs.set_title(i, self.uis[i].get_title())
 
         self.title_label = widgets.Label(f"DeepFloyd IF Lab v{VERSION}", layout=Layout(display="flex",
-                                                                                   justify_content="flex-end"))
+                                                                                       justify_content="flex-end"))
         self.root_box = VBox([self.title_label, self.tabs])
 
     def create_dream_ui(self, stages):
@@ -171,6 +171,12 @@ class DeepFloydIFUI:
                     .lm-TabBar-tabLabel,
                     .lm-TabBar-tabCloseIcon {
                         line-height: var(--jp-widgets-horizontal-tab-height);
+                    }
+                    
+                    .iflab-title-label {
+                        width: 99%;
+                        background-color: var(--jp-layout-color2);
+                        margin-top: 10px;
                     }
                     </style>
                 """

@@ -9,4 +9,6 @@ git pull origin main
 chmod +x ./*.sh
 chmod +x ./**/*.sh
 
+export IFLAB_INSTALL=1
+
 ./open-notebook.sh --force-update

@@ -13,13 +13,14 @@ Advanced notebook-based web UI for [DeepFloyd IF](https://github.com/deep-floyd/
 * PNGInfo
 * Convenient batch generation workflow.
 * Full control of IF stage parameters.
+* JupyterLab environment.
 * IF scripting directly in the notebook.
 
 ## Minimum System Requirements
 
-* 24GB of system RAM.
-* 8-12GB of VRAM (24GB is recommended).
-* 50GB of disk space.
+* 16GB of system RAM (32GB or more is recommended).
+* 12GB of VRAM (24GB is recommended).
+* 50GB of disk space (SSD is recommended).
 
 ## Installation 
 
@@ -49,22 +50,21 @@ The installation may take around an hour with an average internet connection and
 
 ## Peak VRAM Usage
 
-Peak DeepFloyd IF Lab GPU memory usage for different sets of models, ±1GB.
+Peak DeepFloyd IF Lab GPU memory usage for different sets of models and memory layouts, ±1GB.
 
-| Model set                | Stage produced | Non-optimized | Alternate load¹ |
-|--------------------------|----------------|---------------|----------------|
-| IF-I-XL + IF-II-L        | Stage II       | 16GB          | NA             |  
-| IF-I-XL + IF-II-L + SDx4² | Stage III      | 22GB          | 12GB           |           
-| IF-I-L + IF-II-L         | Stage II       | 9GB           | NA             |
-|  IF-I-L + IF-II-L + SDx4 | Stage III      | 12GB          | 12GB           |
-| IF-I-L + IF-II-M         | Stage II       | 7GB           | NA             |
-| IF-I-L + IF-II-M + SDx4³  | Stage III      | 12GB          | 11GB           |
-| IF-I-M + IF-II-M         | Stage II       | 7GB           | NA             |             
-| IF-I-M + IF-II-M + SDx4  | Stage III      | 12GB          | 11GB           |
+| Model set                 | Stage produced | I+II+III (24GB) | I/II+III (12GB)   | I/II/III (8GB) |
+|---------------------------|----------------|-----------------|-------------------|----------------|
+| IF-I-XL + IF-II-L         | Stage II       | 16GB            | NA                |  NA
+| IF-I-XL + IF-II-L + SDx4  | Stage III      | 22GB            | 12GB              |  12GB
+| IF-I-L + IF-II-L          | Stage II       | 9GB             | NA                |  NA
+| IF-I-L + IF-II-L + SDx4   | Stage III      | 12GB            | 12GB              |  8GB
+| IF-I-L + IF-II-M          | Stage II       | 7GB             | NA                |  NA
+| IF-I-L + IF-II-M + SDx4   | Stage III      | 12GB            | 11GB              |  7GB
+| IF-I-M + IF-II-M          | Stage II       | 7GB             | NA                |  NA 
+| IF-I-M + IF-II-M + SDx4   | Stage III      | 12GB            | 11GB              |  7GB
 
-¹ The alternate load optimization is enabled automatically for GPUs with <24GB of VRAM.<br>
-² The IF-I-XL + IF-II-L + SDx4 model set is used by default on GPUs with ≥12GB of VRAM.<br>
-³ The IF-I-L + IF-II-M + SDx4 model set is used by default on GPUs with <12GB of VRAM.
+The UI attempts to apply the optimal settings depending on the available amount of VRAM. 
+Please see [this](https://github.com/GChristensen/deepfloyd_if_lab/wiki/Memory-Management) wiki page for more details.
 
 ## Screenshots
 | Dream | Style Transfer |
@@ -97,22 +97,19 @@ A: Please try to restart the Jupyter Python kernel or the application.
 
 >Q: It does not work even after I have restarted the application. What should I do next?
 
-A: Please delete the `home/settings.json` file or, if this does not help, the entire `venv` folder.
+A: Please delete the `home/settings.json` file __*and*__ the entire `venv` folder.
 
 >Q: I have enough VRAM, but encounter memory errors. Do I need a system upgrade?
 
-A: Probably. But it is also worth trying to close all unneeded applications, because there may be just not enough free
-system RAM. DeepFloyd IF pushes your machine to its limits, and you need as much free RAM and VRAM as possible.
+A: If your computer does not meet the recommended requirements, it works near the limits of available 
+resources. To run DeepFloyd IF you need as much free VRAM and system RAM as possible. Only the
+recommended requirements allow to achieve more or less seamless experience.
 
 >Q: Can I run this UI on a 8GB GPU?
 
-A: Currently it should be only possible to upscale to stage II with IF-I-L + IF-II-M models on a 8GB GPU.
-
->Q: The generation stucks on the message "Generating T5 embeddings..." Is my machine incapable running DeepFloyd IF?
-
-Your CPU may not be able to process bfloat16 (the default datatype used by T5 encoder) well enough. Currently, the
-only alternative is to add `--t5-dtype float32` command line argument in the `open-notebook` script. 
-Its use may require at least 32GB of system RAM.
+A: The UI may run on a 8GB GPUs with 12GB of system RAM and the swap of the same size, but it may require constant restarts
+due to the insufficient memory. DeepFloyd IF is designed for 24GB of VRAM. 
+Some UI features, such as style transfer, are implemented only for GPUs with 24GB of video memory.
 
 >Q: My generations look like halftone prints that were shredded and glued back by the pieces. How can I improve them?
 
@@ -125,14 +122,14 @@ prompt to stage III. It is also possible to upscale the results of stage II usin
 A: The [official demonstration](https://github.com/deep-floyd/IF#iv-zero-shot-inpainting) of DeepFloyd IF inpainting 
 is quite misleading. Inpainting always produces a static image, and it looks blurry because this is how DeepFloyd IF
 pipeline works. It reduces the source image to 64x64 pixels, inpaints there, and upscales it back. 
-Probably there are bugs, or currently, we do not know something that will allow us to obtain the same quality,
+Probably there are bugs, or currently we do not know something that will allow us to obtain the same quality,
 as it was demonstrated. 
 
 >Q: How do I create an inpainting mask?
 
 A: Currently, DeepFloyd IF Lab has no ability to interactively create a mask just by painting on the source image.
 It is necessary to upload a black-and-white mask image along with the source image. It is possible
-to create a mask image by painting over the source image on a separate layer in your favorite graphical editor, 
+to create a mask image by painting over the source image on separate layers in your favorite graphical editor, 
 or by directly transforming the current selection/alpha channel into the corresponding black-and-white image. 
 Some editors have a macro system that allows to perform such operations in a single keystroke. Please refer to your 
 editor user manual.
@@ -160,7 +157,7 @@ This may not happen in the next 10000 years.
 
 >Q: For educational purposes only, I need to generate images of routine alien reproductive activity with AZC/BZC-chromosome
 > alien individuals placed by the sides and CZC-chromosome individuals in between. Is it possible, given 
-> the superior linguistic abilities of DeepFloyd IF? Can you tell me how to use it for this?
+> the superior linguistic abilities of DeepFloyd IF?
 
 A: Unfortunately, it is not possible. DeepFloyd IF was trained with some lacunas in the knowledge of such topics. Moreover, it has
 a built-in safety filter that sometimes blurs random images which it considers too hot or hateful.

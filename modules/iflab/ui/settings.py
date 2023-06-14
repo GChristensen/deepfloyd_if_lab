@@ -47,12 +47,17 @@ class SettingsUI():
         self.stageIII_model_dropdown.value = settings.get(self.stageIII_model_dropdown.__setting,
                                                           self.stageIII_model_dropdown.options[0])
 
-        self.alternate_load_check = widgets.Checkbox(
-            description="Alternate load"
+        self.sequential_loading_dropdown = widgets.Dropdown(
+            options=[('I+II+III (24GB)', 'off',), ('I/II+III (12GB)', 'merge'), ('I/II/III (8GB)', 'separate')],
+            value='separate',
+            description='Layout: ',
+            style= {'description_width': 'max-content'},
+            disabled=False,
         )
-        self.alternate_load_check.observe(self.on_settings_changed, 'value', type='change')
-        self.alternate_load_check.__setting = "alternate_load"
-        self.alternate_load_check.value = settings.get(self.alternate_load_check.__setting, False)
+        self.sequential_loading_dropdown.observe(self.on_settings_changed, 'value', type='change')
+        self.sequential_loading_dropdown.__setting = "sequential_load"
+        self.sequential_loading_dropdown.value = settings.get(self.sequential_loading_dropdown.__setting,
+                                                              self.sequential_loading_dropdown.options[2][1])
 
         generation_label = widgets.Label(" Generation",
                                          style=dict(background="var(--jp-layout-color2)"))
@@ -76,7 +81,7 @@ class SettingsUI():
         self.root_box = VBox([models_label,
                               self.stageI_model_dropdown, self.stageII_model_dropdown,
                               self.stageIII_model_dropdown,
-                              self.alternate_load_check,
+                              self.sequential_loading_dropdown,
                               generation_label,
                               self.disable_watermark_check,
                               ui_label,

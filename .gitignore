@@ -6,10 +6,10 @@ __pycache__
 /modules/iflab/pipelines/experimental
 /sync.cmd
 /mkdiff.cmd
+/user.xsh
 /home/*
-!/home/.jupyter
-/home/.jupyter/*
-!/home/.jupyter/lab
+!/home/default
+/notebooks
 /venv
 /user-notebook-dev.cmd
 /notebooks/outputs

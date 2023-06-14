@@ -22,4 +22,5 @@ else
   source venv/bin/activate
 fi
 
-xonsh scripts/notebook.xsh ${COMMANDLINE_ARGS}
+xonsh scripts/update.xsh "$@"
+xonsh scripts/notebook.xsh "$@"

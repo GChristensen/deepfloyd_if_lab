@@ -1,6 +1,7 @@
 import importlib
 import time
 import random
+import traceback
 
 from abc import ABC, abstractmethod
 from collections import UserDict
@@ -9,7 +10,10 @@ from datetime import datetime
 from random import randint
 
 import numpy as np
+from torch import autocast
+
 from .stages import ModelError
+from .. import SEQ_LOAD_OFF, SEQ_LOAD_SEPARATE, DEBUG, SEQ_LOAD_MERGE
 
 
 @dataclass
@@ -31,8 +35,6 @@ class Pipeline(ABC):
         self.stages = stages
 
         self.count = 1
-        self.finish_generation = False
-        self.batches = 100
 
         self.aspect_ratio = "1:1"
         self.prompt = None
@@ -68,15 +70,38 @@ class Pipeline(ABC):
         self.disable_watermark = False
         self.pass_prompt_to_stage_III = None
 
+        self.on_before_embeddings = lambda: None
         self.on_before_generation = lambda: None
         self.on_before_upscale = lambda: None
+        self.on_before_checkpoints_loaded = lambda m: None
+        self.on_checkpoints_loaded = lambda: None
 
         try:
             self.experimental = importlib.import_module('.'.join(__name__.split('.')[:-1]) + ".experimental")
         except ImportError as e:
             self.experimental = None
 
+    def prepare_embeddings(self):
+        if not self.stages.has_t5():
+            self.on_before_checkpoints_loaded(False)
+
+        self.stages.free_stageIII()
+        self.stages.free_stageII()
+        self.stages.free_stageI()
+
+        was_loaded = self.stages.ensure_t5()
+
+        if not self.has_t5_loaded:
+            raise ModelError("Error loading T5 encoder.")
+
+        if was_loaded:
+            self.on_checkpoints_loaded()
+
+        self.on_before_embeddings()
+
     def compute_t5_embs(self, update_prompt=True, update_negative=True, update_style=True):
+        self.prepare_embeddings()
+
         if update_prompt:
             if self.prompt is not None:
                 promptv = [self.prompt] * self.count
@@ -87,31 +112,19 @@ class Pipeline(ABC):
         if update_negative:
             if self.negative_prompt is not None:
                 promptv = [self.negative_prompt] * self.count
-                self.negative_t5_embs = self.stages.t5.get_text_embeddings(promptv)
+                self.t5_embs = self.stages.t5.get_text_embeddings(promptv)
             else:
                 self.negative_t5_embs = None
 
         if update_style:
             if self.style_prompt is not None:
                 promptv = [self.style_prompt] * self.count
-                self.style_t5_embs = self.stages.t5.get_text_embeddings(promptv)
+                self.t5_embs = self.stages.t5.get_text_embeddings(promptv)
             else:
                 self.style_t5_embs = None
 
     def generate_seed(self):
         return randint(0, np.iinfo(np.int32).max)
-
-    @property
-    def generations(self):
-        return self.generationsI
-
-    def stop_generation(self):
-        self.finish_generation = True
-
-    def reset_generations(self):
-        random.seed(datetime.now().timestamp())
-        self.finish_generation = False
-        self.generationsI = {}
 
     def prepare_prompts(self):
         prompt = [self.prompt] if isinstance(self.prompt, str) else self.prompt
@@ -134,7 +147,11 @@ class Pipeline(ABC):
 
     @property
     def is_optimized(self):
-        return self.stages.alternate_load
+        return self.stages.sequential_load != SEQ_LOAD_OFF
+
+    @property
+    def has_t5_loaded(self):
+        return self.stages.has_t5()
 
     @property
     def has_stageI_loaded(self):
@@ -149,15 +166,23 @@ class Pipeline(ABC):
         return self.stages.has_stageIII()
 
     def prepare_generation(self):
-        self.on_before_generation()
-        self.stages.free_stageII(False)
+        if not self.stages.has_stageI():
+            self.on_before_checkpoints_loaded(not self.stages.downloaded_stageI())
+
+        self.stages.free_t5()
+        self.stages.free_stageII()
         self.stages.free_stageIII()
-        self.stages.ensure_stageI()
+        was_loaded = self.stages.ensure_stageI()
 
         if not self.has_stageI_loaded:
             raise ModelError("Error loading stage I model.")
 
-    def generate(self, seed=None, progress=True, reference=False):
+        if was_loaded:
+            self.on_checkpoints_loaded()
+
+        self.on_before_generation()
+
+    def generate(self, seed=None, progress=True, is_reference=False):
         self.prepare_generation()
 
         if seed is None:
@@ -196,7 +221,7 @@ class Pipeline(ABC):
 
         time_start = time.perf_counter()
 
-        invoke = self.invoke_ref if reference else self.invoke
+        invoke = self.invoke_ref if is_reference else self.invoke
         self.result_stageI = invoke(**kwargs)
 
         duration = time.perf_counter() - time_start
@@ -209,42 +234,45 @@ class Pipeline(ABC):
 
         return self.result_stageI
 
-    def generate_series(self, steps=None, seed=None, callback=None, progress=True):
-        steps = steps or self.batches
-        generate_seed = seed is None
-
-        for i in range(0, steps):
-            if self.finish_generation:
-                break
-
-            if generate_seed:
-                seed = self.generate_seed()
-
-            result = self.generate(seed, progress=progress)
-
-            if callback is not None:
-                callback(result)
-
     def prepare_upscale(self, stage):
-        self.on_before_upscale()
+        if not self.stages.has_stageII() or not self.stages.has_stageIII():
+            missing = stage == "II" and not self.stages.downloaded_stageII() or \
+                      stage == "III" and not self.stages.downloaded_stageIII()
+
+            self.on_before_checkpoints_loaded(missing)
+
+        self.stages.free_t5()
         self.stages.free_stageI()
 
-        self.stages.ensure_stageII()
+        was_loaded = False
+        if stage == "II":
+            if self.stages.sequential_load == SEQ_LOAD_SEPARATE and self.has_stageIII_loaded:
+                self.stages.free_stageIII()
 
-        if not self.has_stageII_loaded:
-            raise ModelError("Error loading stage II model.")
+            was_loaded = self.stages.ensure_stageII()
 
-        if stage == "III":
-            self.stages.ensure_stageIII()
+            if not self.has_stageII_loaded:
+                raise ModelError("Error loading stage II model.")
+
+        if stage == "III" or self.stages.sequential_load == SEQ_LOAD_MERGE:
+            if self.stages.sequential_load == SEQ_LOAD_SEPARATE and self.has_stageII_loaded:
+                self.stages.free_stageII()
+
+            try:
+                was_loaded = self.stages.ensure_stageIII() or was_loaded
+            except Exception as e:
+                if DEBUG:
+                    traceback.print_exc()
 
             if not self.has_stageIII_loaded:
                 raise ModelError("Error loading stage III model.")
 
-    def upscale(self, seed=None, stage="II", progress=False, reference=False):
-        self.prepare_upscale(stage)
+        if was_loaded:
+            self.on_checkpoints_loaded()
 
-        resultI = self.result_stageI if seed is None else self.generationsI[seed]
+        self.on_before_upscale()
 
+    def get_upscaleII_kwargs(self, resultI):
         if_II_kwargs = UserDict({
             "guidance_scale": self.guidanceII,
             "sample_timestep_respacing": self.stepsII
@@ -254,21 +282,36 @@ class Pipeline(ABC):
         # some extra parameters are passed as metadata to preserve the original interface
         resultI.args.imagesI = resultI.images["I"]
         resultI.args.tensorsI = resultI.tensors[0]
-        resultI.args.pass_prompt_to_sIII = self.pass_prompt_to_stage_III
 
-        if_III_kwargs = {
+        return if_II_kwargs
+
+    def get_upscaleIII_kwargs(self, resultII):
+        if_III_kwargs = UserDict({
             "guidance_scale": self.guidanceIII,
             "noise_level": self.noiseIII,
             "sample_timestep_respacing": str(self.stepsIII),
-        }
+        })
         self.add_custom_parameters(if_III_kwargs, self.custom_paramsIII)
-        if_III = self.stages.if_III
 
-        if stage == "II":
-            if_III_kwargs = None
-            if_III = None
+        if_III_kwargs.imagesII = resultII.images["II"]
+        if_III_kwargs.tensorsII = resultII.tensors[1]
+        if_III_kwargs.pass_prompt_to_sIII = self.pass_prompt_to_stage_III
 
+        return if_III_kwargs
+
+    def upscale(self, resultI=None, resultII=None, progress=False, is_reference=False):
+        stage = "III" if resultII else "II"
+
+        self.prepare_upscale(stage)
+
+        seed = resultI.seed
+        rtime = resultI.time
+        if_I_kwargs = resultI.args
+        if_II_kwargs = self.get_upscaleII_kwargs(resultI) if stage == "II" else None
+        if_III_kwargs = self.get_upscaleIII_kwargs(resultII) if stage == "III" else None
+        if_III = self.stages.if_III if stage == "III" else None
         prompt, negative, style = self.prepare_prompts()
+
         time_start = time.perf_counter()
 
         kwargs = dict(
@@ -277,8 +320,8 @@ class Pipeline(ABC):
             negative_prompt=negative,
             style_prompt=style,
             disable_watermark=self.disable_watermark,
-            seed=resultI.seed,
-            if_I_kwargs=resultI.args,
+            seed=seed,
+            if_I_kwargs=if_I_kwargs,
             if_II_kwargs=if_II_kwargs,
             if_III_kwargs=if_III_kwargs,
             return_tensors=True,
@@ -289,14 +332,14 @@ class Pipeline(ABC):
         self.merge_args(kwargs, self.override_args)
         seed = kwargs["seed"]
 
-        invoke = self.invoke_ref if reference else self.invoke
+        invoke = self.invoke_ref if is_reference else self.invoke
         self.result_upscale = invoke(**kwargs)
 
         duration = time.perf_counter() - time_start
 
         images, tensors = self.result_upscale
         output = images.get("output", [[]])
-        self.result_upscale = IFResult(images, tensors, output, resultI.args, resultI.seed, resultI.time, 0, duration)
+        self.result_upscale = IFResult(images, tensors, output, if_II_kwargs, seed, rtime, 0, duration)
 
         return self.result_upscale
 

@@ -4,7 +4,8 @@ from collections import UserDict
 
 from deepfloyd_if.pipelines import super_resolution
 from .pipeline import Pipeline, IFResult
-from .. import EXPERIMENTAL
+from .stages import ModelError
+from .. import EXPERIMENTAL, SEQ_LOAD_SEPARATE
 
 
 class SuperResolutionPipeline(Pipeline):
@@ -30,7 +31,12 @@ class SuperResolutionPipeline(Pipeline):
             return super_resolution(**kwargs)
 
     def generate(self, seed=None, progress=True, reference=False):
+        if self.stages.sequential_load == SEQ_LOAD_SEPARATE:
+            raise ModelError("Not implemented for I/II/III")
+
+        self.prepare_upscale("II")
         self.prepare_upscale("III")
+        self.on_before_generation()
 
         if seed is None:
             seed = self.generate_seed()
@@ -68,14 +74,17 @@ class SuperResolutionPipeline(Pipeline):
         if negative:
             kwargs["negative_prompt"] = negative
 
-        time_start = time.perf_counter()
         self.merge_args(kwargs, self.override_args)
         seed = kwargs["seed"]
 
+        time_start = time.perf_counter()
         invoke = self.invoke_ref if reference else self.invoke
         middle_res = invoke(
             **kwargs
         )
+
+        self.on_before_upscale()
+
         self.result_upscale = invoke(
             t5=self.stages.t5,
             if_III=self.stages.if_III,

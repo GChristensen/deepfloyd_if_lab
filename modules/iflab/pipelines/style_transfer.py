@@ -2,7 +2,8 @@ from deepfloyd_if.pipelines import style_transfer
 from deepfloyd_if.pipelines.utils import _prepare_pil_image
 
 from .pipeline import Pipeline, IFResult
-from .. import EXPERIMENTAL
+from .stages import ModelError
+from .. import EXPERIMENTAL, SEQ_LOAD_OFF
 
 
 class StylePipeline(Pipeline):
@@ -28,6 +29,12 @@ class StylePipeline(Pipeline):
 
     def modify_args(self, args):
         args["support_pil_img"] = self.support_image
+        # TODO: move support images to the class level in all pipelines for optimization
         args["if_I_kwargs"].low_res = _prepare_pil_image(self.support_image, 64)
         args["if_I_kwargs"].mid_res = _prepare_pil_image(self.support_image, 256)
 
+    def upscale(self, **kwargs):
+        if self.stages.sequential_load != SEQ_LOAD_OFF:
+            raise ModelError("Upscale is implemented only for I+II+III")
+        else:
+            return super().upscale(**kwargs)

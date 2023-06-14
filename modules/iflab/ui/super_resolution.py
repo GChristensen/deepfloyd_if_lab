@@ -23,29 +23,19 @@ class SuperResolutionUI(PipelineUI):
     def get_title(self):
         return "Super Resolution"
 
-    @catch_handler_errors
-    def generate_series(self, button=None, seed=None, steps=None, single=False):
-        try:
-            self.upscaling = True
-            self.upscaling_stage = "III"
-            self.pipeline.generate_series(steps=steps, seed=seed, callback=self.process_stageI_result, progress=self.update_progress)
-            self.reset_progress()
-            self.generation_thread = None
-        finally:
-            self.generation_thread = None
-            if not single:
-                button.description = self.SERIES_BUTTON_LABEL
+    def on_before_generation(self):
+        self.upscaling = True
+        self.upscaling_stage = "III"
+        super().on_before_generation()
 
     def process_stageI_result(self, result):
-        with self.output:
-            if self.upscaling_progress_event:
-                self.upscaling_progress_event.set()
+        if self.upscaling_progress_event:
+            self.upscaling_progress_event.set()
 
-            self.process_upscale_result(result.seed, result, "III")
+        self.process_upscale_result(result.seed, result, "III")
 
-            duration = round(result.duration, 1)
-            label = "Stages II-III"
-            self.status_box.children = [widgets.Label(f"{label}: {duration}s")]
+        duration = round(result.duration)
+        self.status_message(f"Stages II-III: {duration}s")
 
     def set_support_image(self, image, parameters):
         self.support_img_view.value = self._image_to_bytes(image)

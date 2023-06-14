@@ -1,6 +1,6 @@
 diff -r '--unified=1' -x '*.pyc' deepfloyd_if-master/model/gaussian_diffusion.py deepfloyd_if/model/gaussian_diffusion.py
 --- deepfloyd_if-master/model/gaussian_diffusion.py	2023-06-02 23:06:46.000000000 +0400
-+++ deepfloyd_if/model/gaussian_diffusion.py	2023-06-06 16:09:10.375117600 +0400
++++ deepfloyd_if/model/gaussian_diffusion.py	2023-06-09 12:13:23.759603700 +0400
 @@ -487,2 +487,3 @@
  
 +            n_indices = len(indices)
@@ -25,7 +25,7 @@ diff -r '--unified=1' -x '*.pyc' deepfloyd_if-master/model/gaussian_diffusion.py
                  yield out
 diff -r '--unified=1' -x '*.pyc' deepfloyd_if-master/modules/base.py deepfloyd_if/modules/base.py
 --- deepfloyd_if-master/modules/base.py	2023-06-02 23:06:46.000000000 +0400
-+++ deepfloyd_if/modules/base.py	2023-06-06 16:09:10.375117600 +0400
++++ deepfloyd_if/modules/base.py	2023-06-09 12:13:23.759603700 +0400
 @@ -179,4 +179,8 @@
          else:
 +            if support_noise.shape != (1, 3, image_h, image_w):
@@ -37,7 +37,7 @@ diff -r '--unified=1' -x '*.pyc' deepfloyd_if-master/modules/base.py deepfloyd_i
              q_sample_steps = torch.tensor([int(len(diffusion.timestep_map) - 1 - support_noise_less_qsample_steps)])
 diff -r '--unified=1' -x '*.pyc' deepfloyd_if-master/pipelines/dream.py deepfloyd_if/pipelines/dream.py
 --- deepfloyd_if-master/pipelines/dream.py	2023-06-02 23:06:46.000000000 +0400
-+++ deepfloyd_if/pipelines/dream.py	2023-06-07 16:25:30.224162400 +0400
++++ deepfloyd_if/pipelines/dream.py	2023-06-12 12:45:31.598602200 +0400
 @@ -57,3 +57,4 @@
          seed = int((datetime.utcnow().timestamp() * 10 ** 6) % (2 ** 32 - 1))
 -    if_I.seed_everything(seed)
@@ -58,7 +58,7 @@ diff -r '--unified=1' -x '*.pyc' deepfloyd_if-master/pipelines/dream.py deepfloy
 +        if style_t5_embs is None:
 +            style_t5_embs = t5.get_text_embeddings(style_prompt)
          if_I_kwargs['style_t5_embs'] = style_t5_embs
-@@ -80,7 +85,17 @@
+@@ -80,7 +85,16 @@
              negative_prompt = [negative_prompt]
 -        negative_t5_embs = t5.get_text_embeddings(negative_prompt)
 +        negative_t5_embs = if_I_kwargs.get('negative_t5_embs', None)
@@ -73,43 +73,53 @@ diff -r '--unified=1' -x '*.pyc' deepfloyd_if-master/pipelines/dream.py deepfloy
 +        stageI_output = None
 +        stageI_generations = if_I_kwargs.tensorsI
 +        pil_images_I = if_I_kwargs.imagesI
-+        pass_prompt_to_sIII = if_I_kwargs.pass_prompt_to_sIII
 +    else:
 +        stageI_output = if_I.embeddings_to_image(**if_I_kwargs)
 +        stageI_generations, _ = stageI_output
 +        pil_images_I = if_I.to_images(stageI_generations, disable_watermark=disable_watermark)
  
-@@ -97,3 +112,4 @@
+@@ -88,3 +102,3 @@
+ 
+-    if if_II is not None:
++    if if_II is not None and not (if_III_kwargs and hasattr(if_III_kwargs, "imagesII")):
+         if_II_kwargs = if_II_kwargs or {}
+@@ -97,3 +111,4 @@
  
 -        stageII_generations, _meta = if_II.embeddings_to_image(**if_II_kwargs)
 +        stageII_output = if_II.embeddings_to_image(**if_II_kwargs)
 +        stageII_generations, _meta = stageII_output
          pil_images_II = if_II.to_images(stageII_generations, disable_watermark=disable_watermark)
-@@ -102,4 +118,6 @@
+@@ -102,5 +117,11 @@
      else:
 +        stageII_output = None
          stageII_generations = None
++        if if_III_kwargs and hasattr(if_III_kwargs, "imagesII"):
++            stageII_generations = if_III_kwargs.tensorsII
++            result['II'] = if_III_kwargs.imagesII
++            pass_prompt_to_sIII = if_III_kwargs.pass_prompt_to_sIII
  
+-    if if_II is not None and if_III is not None:
 +    stageIII_output = None
-     if if_II is not None and if_III is not None:
-@@ -110,3 +128,3 @@
++    if if_III is not None:
+         if_III_kwargs = if_III_kwargs or {}
+@@ -110,3 +131,3 @@
              if if_III.use_diffusers:
 -                if_III_kwargs['prompt'] = prompt[idx: idx+1]
 +                if_III_kwargs['prompt'] = prompt[idx: idx+1] if pass_prompt_to_sIII else ['']
  
-@@ -125,3 +143,4 @@
+@@ -125,3 +146,4 @@
  
 -            _stageIII_generations, _meta = if_III.embeddings_to_image(**if_III_kwargs)
 +            stageIII_output = if_III.embeddings_to_image(**if_III_kwargs)
 +            _stageIII_generations, _meta = stageIII_output
              stageIII_generations.append(_stageIII_generations)
-@@ -136,2 +155,3 @@
+@@ -136,2 +158,3 @@
      if return_tensors:
 +        result["output"] = (stageI_output, stageII_output, stageIII_output)
          return result, (stageI_generations, stageII_generations, stageIII_generations)
 diff -r '--unified=1' -x '*.pyc' deepfloyd_if-master/pipelines/inpainting.py deepfloyd_if/pipelines/inpainting.py
 --- deepfloyd_if-master/pipelines/inpainting.py	2023-06-02 23:06:46.000000000 +0400
-+++ deepfloyd_if/pipelines/inpainting.py	2023-06-06 16:09:10.375117600 +0400
++++ deepfloyd_if/pipelines/inpainting.py	2023-06-12 12:45:31.598602200 +0400
 @@ -34,3 +34,5 @@
  
 -    t5_embs = t5.get_text_embeddings(prompt)
@@ -133,7 +143,7 @@ diff -r '--unified=1' -x '*.pyc' deepfloyd_if-master/pipelines/inpainting.py dee
 +    mid_res = getattr(if_I_kwargs, 'mid_res') if hasattr(if_I_kwargs, 'mid_res') else _prepare_pil_image(support_pil_img, 256)
 +    high_res = getattr(if_I_kwargs, 'high_res') if hasattr(if_I_kwargs, 'high_res') else _prepare_pil_image(support_pil_img, 1024)
  
-@@ -60,9 +64,16 @@
+@@ -60,9 +64,15 @@
  
 -    inpainting_mask_I = img_as_bool(resize(inpainting_mask[0].cpu(), (3, image_h, image_w)))
 -    inpainting_mask_I = torch.from_numpy(inpainting_mask_I).unsqueeze(0).to(if_I.device)
@@ -147,7 +157,6 @@ diff -r '--unified=1' -x '*.pyc' deepfloyd_if-master/pipelines/inpainting.py dee
 +        stageI_generations = if_I_kwargs.tensorsI
 +        pil_images_I = if_I_kwargs.imagesI
 +        stageI_output = None
-+        pass_prompt_to_sIII = if_I_kwargs.pass_prompt_to_sIII
 +    else:
 +        inpainting_mask_I = img_as_bool(resize(inpainting_mask, (3, image_h, image_w)))
 +        inpainting_mask_I = torch.from_numpy(inpainting_mask_I).unsqueeze(0).to(if_I.device)
@@ -157,48 +166,61 @@ diff -r '--unified=1' -x '*.pyc' deepfloyd_if-master/pipelines/inpainting.py dee
 +        stageI_generations, _ = stageI_output
 +        pil_images_I = if_I.to_images(stageI_generations, disable_watermark=disable_watermark)
  
-@@ -83,3 +94,3 @@
+@@ -70,3 +80,3 @@
+ 
+-    if if_II is not None:
++    if if_II is not None and not (if_III_kwargs and hasattr(if_III_kwargs, "imagesII")):
+         _, _, image_h, image_w = mid_res.shape
+@@ -83,3 +93,3 @@
          if 'inpainting_mask' not in if_II_kwargs:
 -            inpainting_mask_II = img_as_bool(resize(inpainting_mask[0].cpu(), (3, image_h, image_w)))
 +            inpainting_mask_II = img_as_bool(resize(inpainting_mask, (3, image_h, image_w)))
              inpainting_mask_II = torch.from_numpy(inpainting_mask_II).unsqueeze(0).to(if_II.device)
-@@ -87,3 +98,4 @@
+@@ -87,3 +97,4 @@
  
 -        stageII_generations, _meta = if_II.embeddings_to_image(**if_II_kwargs)
 +        stageII_output = if_II.embeddings_to_image(**if_II_kwargs)
 +        stageII_generations, _meta = stageII_output
          pil_images_II = if_II.to_images(stageII_generations, disable_watermark=disable_watermark)
-@@ -92,2 +104,3 @@
+@@ -92,5 +103,10 @@
      else:
 +        stageII_output = None
          stageII_generations = None
-@@ -101,3 +114,3 @@
++        if if_III_kwargs and hasattr(if_III_kwargs, "imagesII"):
++            stageII_generations = if_III_kwargs.tensorsII
++            result['II'] = if_III_kwargs.imagesII
++            pass_prompt_to_sIII = if_III_kwargs.pass_prompt_to_sIII
+ 
+-    if if_II is not None and if_III is not None:
++    if if_III is not None:
+         _, _, image_h, image_w = high_res.shape
+@@ -101,3 +117,3 @@
              if if_III.use_diffusers:
 -                if_III_kwargs['prompt'] = prompt[idx: idx+1]
 +                if_III_kwargs['prompt'] = prompt[idx: idx+1] if pass_prompt_to_sIII else ['']
  
-@@ -112,3 +125,3 @@
+@@ -112,3 +128,3 @@
              if 'inpainting_mask' not in if_III_kwargs:
 -                inpainting_mask_III = img_as_bool(resize(inpainting_mask[0].cpu(), (3, image_h, image_w)))
 +                inpainting_mask_III = img_as_bool(resize(inpainting_mask, (3, image_h, image_w)))
                  inpainting_mask_III = torch.from_numpy(inpainting_mask_III).unsqueeze(0).to(if_III.device)
-@@ -116,3 +129,4 @@
+@@ -116,3 +132,4 @@
  
 -            _stageIII_generations, _meta = if_III.embeddings_to_image(**if_III_kwargs)
 +            stageIII_output = if_III.embeddings_to_image(**if_III_kwargs)
 +            _stageIII_generations, _meta = stageIII_output
              stageIII_generations.append(_stageIII_generations)
-@@ -124,2 +138,3 @@
+@@ -124,2 +141,3 @@
      else:
 +        stageIII_output = None
          stageIII_generations = None
-@@ -127,2 +142,3 @@
+@@ -127,2 +145,3 @@
      if return_tensors:
 +        result["output"] = (stageI_output, stageII_output, stageIII_output)
          return result, (stageI_generations, stageII_generations, stageIII_generations)
 diff -r '--unified=1' -x '*.pyc' deepfloyd_if-master/pipelines/style_transfer.py deepfloyd_if/pipelines/style_transfer.py
 --- deepfloyd_if-master/pipelines/style_transfer.py	2023-06-02 23:06:46.000000000 +0400
-+++ deepfloyd_if/pipelines/style_transfer.py	2023-06-06 16:09:10.375117600 +0400
++++ deepfloyd_if/pipelines/style_transfer.py	2023-06-12 12:45:31.582990700 +0400
 @@ -13,3 +13,3 @@
      if_I,
 -    if_II,
@@ -229,7 +251,7 @@ diff -r '--unified=1' -x '*.pyc' deepfloyd_if-master/pipelines/style_transfer.py
 +        if negative_t5_embs is None:
 +            negative_t5_embs = t5.get_text_embeddings(negative_prompt)
      else:
-@@ -49,6 +57,7 @@
+@@ -49,6 +57,8 @@
  
 -    low_res = _prepare_pil_image(support_pil_img, 64)
 -    mid_res = _prepare_pil_image(support_pil_img, 256)
@@ -237,35 +259,45 @@ diff -r '--unified=1' -x '*.pyc' deepfloyd_if-master/pipelines/style_transfer.py
 +    mid_res = getattr(if_I_kwargs, 'mid_res') if hasattr(if_I_kwargs, 'mid_res') else _prepare_pil_image(support_pil_img, 256)
      # high_res = _prepare_pil_image(support_pil_img, 1024)
  
++    pass_prompt_to_sIII = True
 +    stageI_output = None
      result = {}
-@@ -68,4 +77,10 @@
+@@ -68,4 +78,8 @@
  
 -        stageI_generations, _ = if_I.embeddings_to_image(**if_I_kwargs)
 -        pil_images_I = if_I.to_images(stageI_generations, disable_watermark=disable_watermark)
-+        pass_prompt_to_sIII = True
 +        if if_I_kwargs and hasattr(if_I_kwargs, "imagesI"):
 +            stageI_generations = if_I_kwargs.tensorsI
 +            pil_images_I = if_I_kwargs.imagesI
-+            pass_prompt_to_sIII = if_I_kwargs.pass_prompt_to_sIII
 +        else:
 +            stageI_generations, _ = if_I.embeddings_to_image(**if_I_kwargs)
 +            pil_images_I = if_I.to_images(stageI_generations, disable_watermark=disable_watermark)
  
-@@ -90,3 +105,4 @@
+@@ -75,3 +89,3 @@
+ 
+-    if if_II is not None:
++    if if_II is not None and not (if_III_kwargs and hasattr(if_III_kwargs, "imagesII")):
+         if stageI_generations is None:
+@@ -90,3 +104,4 @@
  
 -        stageII_generations, _meta = if_II.embeddings_to_image(**if_II_kwargs)
 +        stageII_output = if_II.embeddings_to_image(**if_II_kwargs)
 +        stageII_generations, _meta = stageII_output
          pil_images_II = if_II.to_images(stageII_generations, disable_watermark=disable_watermark)
-@@ -95,4 +111,6 @@
+@@ -95,5 +110,11 @@
      else:
 +        stageII_output = None
          stageII_generations = None
++        if if_III_kwargs and hasattr(if_III_kwargs, "imagesII"):
++            stageII_generations = if_III_kwargs.tensorsII
++            result['II'] = if_III_kwargs.imagesII
++            pass_prompt_to_sIII = if_III_kwargs.pass_prompt_to_sIII
  
+-    if if_II is not None and if_III is not None:
 +    stageIII_output = None
-     if if_II is not None and if_III is not None:
-@@ -103,3 +121,6 @@
++    if if_III is not None:
+         if_III_kwargs = if_III_kwargs or {}
+@@ -103,3 +124,6 @@
              if if_III.use_diffusers:
 -                if_III_kwargs['prompt'] = prompt[idx: idx+1] if prompt is not None else style_prompt[idx: idx+1]
 +                if pass_prompt_to_sIII:
@@ -273,19 +305,28 @@ diff -r '--unified=1' -x '*.pyc' deepfloyd_if-master/pipelines/style_transfer.py
 +                else:
 +                    if_III_kwargs['prompt'] = ['']
  
-@@ -118,3 +139,4 @@
+@@ -109,6 +133,6 @@
+             if_III_kwargs['progress'] = progress
+-            style_t5_embs = if_II_kwargs.get('style_t5_embs')
++            style_t5_embs = if_I_kwargs.get('style_t5_embs')
+             if style_t5_embs is not None:
+                 style_t5_embs = style_t5_embs[idx:idx+1]
+-            positive_t5_embs = if_II_kwargs.get('positive_t5_embs')
++            positive_t5_embs = if_I_kwargs.get('positive_t5_embs')
+             if positive_t5_embs is not None:
+@@ -118,3 +142,4 @@
  
 -            _stageIII_generations, _meta = if_III.embeddings_to_image(**if_III_kwargs)
 +            stageIII_output = if_III.embeddings_to_image(**if_III_kwargs)
 +            _stageIII_generations, _meta = stageIII_output
              stageIII_generations.append(_stageIII_generations)
-@@ -129,2 +151,3 @@
+@@ -129,2 +154,3 @@
      if return_tensors:
 +        result["output"] = (stageI_output, stageII_output, stageIII_output)
          return result, (stageI_generations, stageII_generations, stageIII_generations)
 diff -r '--unified=1' -x '*.pyc' deepfloyd_if-master/pipelines/super_resolution.py deepfloyd_if/pipelines/super_resolution.py
 --- deepfloyd_if-master/pipelines/super_resolution.py	2023-06-02 23:06:46.000000000 +0400
-+++ deepfloyd_if/pipelines/super_resolution.py	2023-06-06 16:09:10.375117600 +0400
++++ deepfloyd_if/pipelines/super_resolution.py	2023-06-09 12:13:23.759603700 +0400
 @@ -30,3 +30,5 @@
      if prompt is not None:
 -        t5_embs = t5.get_text_embeddings(prompt)
