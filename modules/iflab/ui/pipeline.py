@@ -256,15 +256,26 @@ class PipelineUI(ABC):
         self.generate_series_button.on_click(self.on_generate_series_click)
         self.clear_results_button = widgets.Button(
             description='🗑️',
-            tooltip='Clear generations',
+            tooltip='Clear stage I results',
             layout=Layout(width="40px")
         )
         self.clear_results_button.on_click(self.clear_results)
+        self.clear_results_button2 = widgets.Button(
+            description='🗑️',
+            tooltip='Clear stage I results',
+            layout=Layout(width="40px")
+        )
+        self.clear_results_button2.on_click(self.clear_results)
         self.upscale_button = widgets.Button(
             description=self.UPSCALE_BUTTON_LABEL,
             tooltip='Upscale the selected stage I images'
         )
         self.upscale_button.on_click(self.on_upscale_click)
+        self.upscale_button2 = widgets.Button(
+            description=self.UPSCALE_BUTTON_LABEL,
+            tooltip='Upscale the selected stage I images'
+        )
+        self.upscale_button2.on_click(self.on_upscale_click)
         self.embeddings_button = widgets.Button(
             description='T5',
             tooltip='Only generate T5 embeddings',
@@ -284,6 +295,12 @@ class PipelineUI(ABC):
             layout=Layout(width="40px")
         )
         self.clear_upscales_button.on_click(self.clear_upscales)
+        self.clear_upscales_button2 = widgets.Button(
+            description='🗑️',
+            tooltip='Clear upscales',
+            layout=Layout(width="40px")
+        )
+        self.clear_upscales_button2.on_click(self.clear_upscales)
         self.custom_parameters_button = widgets.Button(
             description='🎰',
             tooltip='Advanced options',
@@ -361,29 +378,41 @@ class PipelineUI(ABC):
         self.mask_image_box = HBox([self.mask_img_view], layout=Layout(width="50%"))
 
         self.images_box = VBox([
-                                    HBox([
-                                        HBox([self.upload_support_img_button,
-                                              self.paste_support_img_button],
-                                             layout=Layout(width="50%")),
-                                        HBox([self.upload_mask_img_button,
-                                              self.paste_mask_img_button],
-                                             layout=Layout(width="50%"))
-                                    ]),
-                                    HBox([self.support_image_box,
-                                          self.mask_image_box])
+                                HBox([
+                                    HBox([self.upload_support_img_button,
+                                          self.paste_support_img_button],
+                                         layout=Layout(width="50%")),
+                                    HBox([self.upload_mask_img_button,
+                                          self.paste_mask_img_button],
+                                         layout=Layout(width="50%"))
+                                ]),
+                                HBox([self.support_image_box,
+                                      self.mask_image_box])
                                 ], layout=Layout(width="100%"))
 
         self.result_box = HBox([], layout=Layout(width="100%", margin="20px 0", flex_flow="row wrap", display="none"))
+        self.result_button_box = VBox([
+            widgets.HTML("<hr class='iflab-upscale-separator'>"),
+            HBox([self.upscale_button2, self.clear_results_button2])
+        ], layout=Layout(width="100%", margin="5px 0", display="none"))
         self.upscale_box = VBox([], layout=Layout(width="100%", margin="20px 0", display="none"))
+        self.upscale_button_box = VBox([
+            widgets.HTML("<hr class='iflab-upscale-separator'>"),
+            HBox([self.clear_upscales_button2])
+        ], layout=Layout(width="100%", margin="5px 0", display="none"))
 
-        self.root_box = VBox([self.input_box, self.control_box, self.images_box, self.stageI_results_label,
-                              self.result_box, self.upscale_results_label, self.upscale_box, self.output],
+        self.root_box = VBox([self.input_box, self.control_box, self.images_box,
+                              self.stageI_results_label, self.result_box,self.result_button_box,
+                              self.upscale_results_label, self.upscale_box, self.upscale_button_box,
+                              self.output],
                              layout=Layout(width="100%"))
 
         self._tune_ui()
 
-    def _get_nsfw_status(self, tensors):
-        return " 🌭" if getattr(tensors, "__nsfw", False) else ""
+    def _get_nsfw_status(self, result, stage):
+        nsfw = result.tensors is not None and result.tensors[stage] is not None \
+               and hasattr(result.tensors[stage], "hentai")
+        return "*" if nsfw else ""
 
     def _image_to_bytes(self, image):
         b = BytesIO()
@@ -700,7 +729,8 @@ class PipelineUI(ABC):
     def on_upscale_click(self, button):
         with self.output:
             if button.description == self.STOP_BUTTON_LABEL:
-                button.description = self.UPSCALE_BUTTON_LABEL
+                self.upscale_button.description = self.UPSCALE_BUTTON_LABEL
+                self.upscale_button2.description = self.UPSCALE_BUTTON_LABEL
                 self.stop_upscale = True
             elif self.generation_thread is None:
                 button.description = self.STOP_BUTTON_LABEL
@@ -811,7 +841,7 @@ class PipelineUI(ABC):
         if DEBUG:
             image = image_result.resize(size, Image.Resampling.LANCZOS)
             image_view = widgets.Image(value=self._image_to_bytes(image), format='png')
-            nsfw = self._get_nsfw_status(result.tensors[0])
+            nsfw = self._get_nsfw_status(result, 0)
         else:
             file_name = self._get_file_name(result.time, seed, "I")
             image_view = widgets.HTML(f"<img src='/files/{file_name}' style='width: {size[0]}px; height: {size[1]}px'/>",
@@ -827,8 +857,9 @@ class PipelineUI(ABC):
             style={"button_color": "#212121"}
         )
         recycle_button.on_click(lambda b: self.set_seed_value(seed))
+        placeholder = widgets.Label(" ")
 
-        top_box = widgets.HBox([seed_text, spacer, recycle_button])
+        top_box = widgets.HBox([seed_text, spacer, recycle_button, placeholder])
 
         upscale_text = widgets.Label(f"🔬", layout=Layout(width="20px", flex="1 0 20px"))
         upscaleII_check = widgets.Checkbox(
@@ -861,9 +892,10 @@ class PipelineUI(ABC):
         upscale_box = HBox([upscale_text, upscaleII_check, upscaleIII_check, spacer, upscale_sr_button],
                            layout=Layout(width="155px"))
 
-        result_box = VBox([top_box, image_view, upscale_box])
+        result_box = VBox([top_box, image_view, upscale_box], layout=Layout(max_width=f"{size[0]}px"))
 
         self.result_box.layout.display = "flex"
+        self.result_button_box.layout.display = "flex"
         self.stageI_results_label.layout.display = "block"
         self.result_box.children += (result_box,)
 
@@ -906,12 +938,23 @@ class PipelineUI(ABC):
 
         try:
             self.upscaling = True
+            generations = {}
             upscales = {}
 
-            for seed in self.upscaleII:
-                upscales[seed] = "II"
-            for seed in self.upscaleIII:
-                upscales[seed] = "III"
+            for seed in self.resultsI.keys():
+                if seed in self.upscaleIII:
+                    generations[seed] = "III"
+                elif seed in self.upscaleII:
+                    generations[seed] = "II"
+                else:
+                    generations[seed] = None
+
+            for (seed, stage) in generations.items():
+                if stage:
+                    upscales[seed] = stage
+
+            total_images = len(self.upscaleIII) * 2 + len(set(self.upscaleII) - set(self.upscaleIII))
+            i = 0
 
             self.stop_upscale = False
             for (seed, stage) in upscales.items():
@@ -919,19 +962,19 @@ class PipelineUI(ABC):
                     break
 
                 if self.pipeline.stages.sequential_load == SEQ_LOAD_SEPARATE:
-                    self.generate_upscale(seed, "II", stage)
+                    self.generate_upscale(seed, "II", stage, (i := i + 1), total_images)
                 else:
                     if stage == "II":
-                        self.generate_upscale(seed, "II", stage)
+                        self.generate_upscale(seed, "II", stage, (i := i + 1), total_images)
                     elif stage == "III":
-                        self.generate_upscale(seed, "II", stage)
-                        self.generate_upscale(seed, "III", stage)
+                        self.generate_upscale(seed, "II", stage, (i := i + 1), total_images)
+                        self.generate_upscale(seed, "III", stage, (i := i + 1), total_images)
 
             if not self.stop_upscale and self.pipeline.stages.sequential_load == SEQ_LOAD_SEPARATE:
-                for seed in self.upscaleIII:
+                for (i, seed) in enumerate(self.upscaleIII):
                     if self.stop_upscale:
                         break
-                    self.generate_upscale(seed, "III", "III")
+                    self.generate_upscale(seed, "III", "III", (i := i + 1), total_images)
 
             sII_time = f"Stage II: ~{self.stageII_time}s"
             sIII_time = f"Stage III: ~{self.stageIII_time}s"
@@ -953,7 +996,7 @@ class PipelineUI(ABC):
             self.generation_thread = None
             self.upscale_button.description = self.UPSCALE_BUTTON_LABEL
 
-    def generate_upscale(self, seed, stage, stage_max):
+    def generate_upscale(self, seed, stage, stage_max, image_index=None, total_images=None):
         self.upscaling_stage = stage
         self.upscaling_stage_max = stage_max
 
@@ -965,7 +1008,7 @@ class PipelineUI(ABC):
 
             self.stageII_time = round(result.duration)
             self.upscale_resultsII[seed] = result
-            self.process_upscale_result(seed, result, "II")
+            self.process_upscale_result(seed, result, "II", stage_max, image_index, total_images)
 
         elif stage == "III":
             resultI = self.resultsI[seed]
@@ -974,15 +1017,19 @@ class PipelineUI(ABC):
 
             self.stageIII_time = round(result.duration)
             self.stageIII_iter_time = result.duration / self.pipeline.iterationsIII
-            self.process_upscale_result(seed, result, "III")
+            self.process_upscale_result(seed, result, "III", stage_max, image_index, total_images)
 
-    def process_upscale_result(self, seed, result, stage):
+    def process_upscale_result(self, seed, result, stage, stage_max=None, image_index=None, total_images=None):
         image = result.images[stage][0]
         self.save_result(image, result.time, seed, stage)
 
-        #tensor_index = 1 if stage == "II" else 2
-        nsfw = False #self._get_nsfw_status(result.tensors[0 if len(result.tensors) < 2 else tensor_index])
-        seed_text = widgets.Label(f"Seed: {result.seed} ({stage}) {nsfw}")
+        stage_index = 1 if stage == "II" else 2
+        nsfw = self._get_nsfw_status(result, stage_index) if DEBUG else ""
+        seed_text = widgets.Label(f"Seed: {result.seed} ({stage}){nsfw}")
+        spacer = HBox([], layout=Layout(flex="1 0 auto"))
+        image_index = f"{image_index}/{total_images}" if image_index is not None and total_images is not None else ""
+        image_index_label = widgets.Label(image_index)
+        image_header = HBox([seed_text, spacer, image_index_label])
 
         if DEBUG:
             image_view = widgets.Image(
@@ -994,9 +1041,31 @@ class PipelineUI(ABC):
             file_name = self._get_file_name(result.time, seed, stage)
             image_view = widgets.HTML(f"<img src='/files/{file_name}' style='width: max-content'/>")
 
-        hr = widgets.HTML("<hr>")
+        spacer = HBox([], layout=Layout(flex="1 0 auto"))
+        generateIII_button = widgets.Button(
+            description="III",
+            tooltip="Generate stage III",
+            layout=Layout(width="30px"),
+            style={"button_color": "#212121"}
+        )
 
-        result_box = VBox([hr, seed_text, image_view])
+        def generate_stageIII(button):
+            if self.generation_thread is None:
+                try:
+                    generateIII_button.description = "⏳"
+                    self.generation_thread = True
+                    self.generate_upscale(seed, "III", "III")
+                    generateIII_button.layout.display = "none"
+                finally:
+                    self.generation_thread = None
+
+        generateIII_button.on_click(generate_stageIII)
+        result_footer = HBox([spacer, generateIII_button])
+
+        result_box = VBox([image_header, image_view], layout=Layout(max_width="max-content"))
+        if stage_max == "II":
+            result_box.children += (result_footer,)
+        hr = widgets.HTML("<hr class='iflab-upscale-separator'>")
 
         upscale_result_box = self.upscale_result_boxes.get(seed, None)
 
@@ -1004,11 +1073,12 @@ class PipelineUI(ABC):
             upscale_result_box.children += (result_box,)
         else:
             upscale_result_box = VBox([])
-            upscale_result_box.children += (result_box,)
+            upscale_result_box.children += (result_box,) if image_index == 1 else (hr, result_box,)
             self.upscale_result_boxes[seed] = upscale_result_box
             self.upscale_box.children += (upscale_result_box,)
 
         self.upscale_box.layout.display = "flex"
+        self.upscale_button_box.layout.display = "flex"
         self.upscale_results_label.layout.display = "block"
 
     # deeper patching is required to hook into the stage III progress, so here is a mock now
@@ -1018,7 +1088,7 @@ class PipelineUI(ABC):
 
         for i in range(0, self.pipeline.iterationsIII):
             self.progress_bar.value = i
-            if self.upscaling_progress_event.wait(wait_time):
+            if self.upscaling_progress_event and self.upscaling_progress_event.wait(wait_time):
                 self.upscaling_progress_event = None
                 break
 
@@ -1032,10 +1102,14 @@ class PipelineUI(ABC):
     def clear_results(self, button):
         self.resultsI = {}
         self.result_box.children = []
+        self.result_box.layout.display = "none"
+        self.result_button_box.layout.display = "none"
         self.stageI_results_label.layout.display = "none"
 
     def clear_upscales(self, button):
         self.upscale_box.children = []
+        self.upscale_box.layout.display = "none"
+        self.upscale_button_box.layout.display = "none"
         self.upscale_results_label.layout.display = "none"
 
     def save_result(self, image, time, seed, stage):
@@ -1076,6 +1150,7 @@ class PipelineUI(ABC):
         self.setup_pipeline(kwargs)
         self.compute_embeddings()
         result = self.pipeline.generate(seed=seed, progress=True, is_reference=reference_pipeline)
+        self.resultsI[seed] = result
 
         if update_ui:
             self.process_stageI_result(result)
@@ -1086,16 +1161,18 @@ class PipelineUI(ABC):
         if upscale:
             if stage == "II":
                 result = self.pipeline.upscale(resultI=result, progress=True, is_reference=reference_pipeline)
+                self.upscale_resultsII[seed] = result
                 if update_ui:
-                    self.process_upscale_result(seed, result, "II")
+                    self.process_upscale_result(seed, result, "II", "II")
             elif stage == "III":
                 resultII = self.pipeline.upscale(resultI=result, progress=True, is_reference=reference_pipeline)
+                self.upscale_resultsII[seed] = result
                 if update_ui:
-                    self.process_upscale_result(seed, resultII, "II")
+                    self.process_upscale_result(seed, resultII, "II", "III")
                 result = self.pipeline.upscale(resultI=result, resultII=resultII, progress=True,
                                                is_reference=reference_pipeline)
                 if update_ui:
-                    self.process_upscale_result(seed, result, "III")
+                    self.process_upscale_result(seed, result, "III", "III")
 
         if "output" in result.images:
             del result.images["output"]

@@ -178,6 +178,10 @@ class DeepFloydIFUI:
                         background-color: var(--jp-layout-color2);
                         margin-top: 10px;
                     }
+                    .iflab-upscale-separator {
+                        border: none;
+                        border-top: 1px solid var(--jp-layout-color2);
+                    }
                     </style>
                 """
             ))
