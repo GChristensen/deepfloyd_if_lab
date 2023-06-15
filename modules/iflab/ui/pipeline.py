@@ -733,7 +733,8 @@ class PipelineUI(ABC):
                 self.upscale_button2.description = self.UPSCALE_BUTTON_LABEL
                 self.stop_upscale = True
             elif self.generation_thread is None:
-                button.description = self.STOP_BUTTON_LABEL
+                self.upscale_button.description = self.STOP_BUTTON_LABEL
+                self.upscale_button2.description = self.STOP_BUTTON_LABEL
                 self.persist_ui_state()
                 self.show_progress_bar()
                 self.reset_upscale_results()
@@ -890,9 +891,9 @@ class PipelineUI(ABC):
         upscale_sr_button.on_click(on_send_to_sr_click)
 
         upscale_box = HBox([upscale_text, upscaleII_check, upscaleIII_check, spacer, upscale_sr_button],
-                           layout=Layout(width="155px"))
+                           layout=Layout(max_width=f"calc({size[0]}px + 10px)"))
 
-        result_box = VBox([top_box, image_view, upscale_box], layout=Layout(max_width=f"{size[0]}px"))
+        result_box = VBox([top_box, image_view, upscale_box], layout=Layout(max_width=f"calc({size[0]}px + 10px)"))
 
         self.result_box.layout.display = "flex"
         self.result_button_box.layout.display = "flex"
@@ -995,6 +996,7 @@ class PipelineUI(ABC):
                 self.set_status_result()
             self.generation_thread = None
             self.upscale_button.description = self.UPSCALE_BUTTON_LABEL
+            self.upscale_button2.description = self.UPSCALE_BUTTON_LABEL
 
     def generate_upscale(self, seed, stage, stage_max, image_index=None, total_images=None):
         self.upscaling_stage = stage
@@ -1056,6 +1058,7 @@ class PipelineUI(ABC):
                     self.generation_thread = True
                     self.generate_upscale(seed, "III", "III")
                     generateIII_button.layout.display = "none"
+                    self.status_message(f"Stage III: ~{self.stageIII_time}s")
                 finally:
                     self.generation_thread = None
 
