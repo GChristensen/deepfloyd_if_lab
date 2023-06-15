@@ -455,7 +455,7 @@ class PipelineUI(ABC):
     def is_prompt_valid(self):
         return self.prompt_text.value or self.negative_prompt_text.value or self.style_prompt_text.value
 
-    def set_ui_parameters(self, parameters):
+    def set_ui_parameters(self, parameters, is_pnginfo=False):
         self.prompt_text.value = parameters.get("prompt", "")
         self.negative_prompt_text.value = parameters.get("negative_prompt", "")
         self.style_prompt_text.value = parameters.get("style_prompt", "")
@@ -473,13 +473,14 @@ class PipelineUI(ABC):
         self.stageIII_custom_params_text.value = parameters.get("if_III_kwargs", "") or ""
         self.sIII_pass_prompt_check.value = parameters.get("pass_prompt_to_stage_III", True)
 
-        self.mask_image_box.children = [widgets.HTML(f"""
-            Stage: {parameters.get("stage", "")}<br>
-            Stage I model: {parameters.get("stageI_model", "")}<br>
-            Stage II model: {parameters.get("stageII_model", "")}<br>
-            Stage III model: {parameters.get("stageIII_model", "")}<br>
-            T5 precision: {parameters.get("t5_precision", "")}<br>
-        """)]
+        if is_pnginfo:
+            self.mask_image_box.children = [widgets.HTML(f"""
+                Stage: {parameters.get("stage", "")}<br>
+                Stage I model: {parameters.get("stageI_model", "")}<br>
+                Stage II model: {parameters.get("stageII_model", "")}<br>
+                Stage III model: {parameters.get("stageIII_model", "")}<br>
+                T5 precision: {parameters.get("t5_precision", "")}<br>
+            """)]
 
     def set_seed_value(self, seed):
         self.seed_number.value = seed
@@ -583,7 +584,7 @@ class PipelineUI(ABC):
 
             if parameters_json:
                 parameters = json.loads(parameters_json)
-                self.set_ui_parameters(parameters)
+                self.set_ui_parameters(parameters, self.__class__.__name__ == "PNGInfoUI")
 
     @catch_handler_errors
     def load_support_image(self, e):

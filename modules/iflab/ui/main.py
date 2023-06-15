@@ -67,8 +67,12 @@ class DeepFloydIFUI:
         for i in range(len(self.tabs.children)):
             self.tabs.set_title(i, self.uis[i].get_title())
 
-        self.title_label = widgets.Label(f"DeepFloyd IF Lab v{VERSION}", layout=Layout(display="flex",
-                                                                                       justify_content="flex-end"))
+        self.title_label = widgets.Label(f"DeepFloyd IF Lab v{VERSION}",
+                                         layout=Layout(display="flex", justify_content="flex-end"))
+
+        if settings.get("remember_ui_state", False):
+            self.tabs.selected_index = settings.get("active_tab", 0)
+
         self.root_box = VBox([self.title_label, self.tabs])
 
     def create_dream_ui(self, stages):
@@ -91,6 +95,7 @@ class DeepFloydIFUI:
         ui_state = settings.get("ui_state", {})
         ui_state[key] = state
         settings["ui_state"] = ui_state
+        settings["active_tab"] = self.tabs.selected_index
         settings.save()
 
     def load_ui_state(self, key):
