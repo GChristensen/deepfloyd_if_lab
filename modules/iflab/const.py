@@ -1,6 +1,6 @@
 import os
 
-VERSION = "0.2.3"
+VERSION = "0.2.4"
 
 DEBUG = os.getenv("IFLAB_DEBUG", False)
 DEBUG = not not (DEBUG and DEBUG != "0")
