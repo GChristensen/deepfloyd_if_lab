@@ -100,6 +100,7 @@ class DeepFloydIFStages:
             self.sequential_load = apply_default_mem_settings()
 
         self.t5_model_name = "t5-v1_1-xxl"
+        self.t5_dtype = "bfloat16" if os.getenv("IFLAB_T5_DTYPE", "float32").lower() == "bfloat16" else "float32"
         self.stageI_model_name = settings.get("stageI_model", "IF-I-XL-v1.0")
         self.stageII_model_name = settings.get("stageII_model", "IF-II-L-v1.0")
         self.stageIII_model_name = settings.get("stageIII_model", "stable-diffusion-x4-upscaler")
@@ -145,8 +146,7 @@ class DeepFloydIFStages:
 
     def load_t5(self):
         try:
-            t5_dtype_text = os.getenv("IFLAB_T5_DTYPE", "float32")
-            t5_dtype = torch.bfloat16 if t5_dtype_text == "bfloat16" else torch.float32
+            t5_dtype = torch.bfloat16 if self.t5_dtype == "bfloat16" else torch.float32
             t5_model_kwargs = None
             t5_device = "cpu"
 

@@ -320,7 +320,7 @@ class PipelineUI(ABC):
                                 self.clear_results_button, self.upscale_button, self.clear_upscales_button,
                                 self.custom_parameters_button, self.random_seed_button, spacer,
                                 self.pnginfo_button, padder],
-                                layout=Layout(flex="1 0 auto"))
+                               layout=Layout(flex="1 0 auto"))
 
         self.progress_bar = widgets.IntProgress(
             value=0,
@@ -378,17 +378,17 @@ class PipelineUI(ABC):
         self.mask_image_box = HBox([self.mask_img_view], layout=Layout(width="50%"))
 
         self.images_box = VBox([
-                                HBox([
-                                    HBox([self.upload_support_img_button,
-                                          self.paste_support_img_button],
-                                         layout=Layout(width="50%")),
-                                    HBox([self.upload_mask_img_button,
-                                          self.paste_mask_img_button],
-                                         layout=Layout(width="50%"))
-                                ]),
-                                HBox([self.support_image_box,
-                                      self.mask_image_box])
-                                ], layout=Layout(width="100%"))
+            HBox([
+                HBox([self.upload_support_img_button,
+                      self.paste_support_img_button],
+                     layout=Layout(width="50%")),
+                HBox([self.upload_mask_img_button,
+                      self.paste_mask_img_button],
+                     layout=Layout(width="50%"))
+            ]),
+            HBox([self.support_image_box,
+                  self.mask_image_box])
+        ], layout=Layout(width="100%"))
 
         self.result_box = HBox([], layout=Layout(width="100%", margin="20px 0", flex_flow="row wrap", display="none"))
         self.result_button_box = VBox([
@@ -478,6 +478,7 @@ class PipelineUI(ABC):
             Stage I model: {parameters.get("stageI_model", "")}<br>
             Stage II model: {parameters.get("stageII_model", "")}<br>
             Stage III model: {parameters.get("stageIII_model", "")}<br>
+            T5 precision: {parameters.get("t5_precision", "")}<br>
         """)]
 
     def set_seed_value(self, seed):
@@ -524,7 +525,7 @@ class PipelineUI(ABC):
             "if_III_kwargs": self.stageIII_custom_params_text.value,
             "pass_prompt_to_stage_III": self.sIII_pass_prompt_check.value
         }
-        
+
         return parameters
 
     def persist_ui_state(self):
@@ -548,6 +549,7 @@ class PipelineUI(ABC):
             "stage": stage,
             "batch_size": 1,
             "batch_image": 1,
+            "t5_precision": self.pipeline.stages.t5_dtype,
             "stageI_model": self.pipeline.stages.stageI_model_name,
             "stageII_model": self.pipeline.stages.stageII_model_name,
             "stageIII_model": self.pipeline.stages.stageIII_model_name,
