@@ -22,6 +22,11 @@ if sys.platform == "darwin":
 IFLAB_HOME = os.getenv("IFLAB_HOME")
 LOGGED_IN_HF = os.path.exists(os.path.join(IFLAB_HOME, "home", "huggingface", "token"))
 
+DEFAULT_MODEL_T5 = "t5-v1_1-xxl"
+DEFAULT_MODEL_I = "IF-I-XL-v1.0"
+DEFAULT_MODEL_II = "IF-II-L-v1.0"
+DEFAULT_MODEL_III = "stable-diffusion-x4-upscaler"
+
 if EXPERIMENTAL:
     try:
         experimental_module = importlib.import_module('.'.join(__name__.split('.')[:-1]) + ".experimental")
@@ -96,14 +101,14 @@ class DeepFloydIFStages:
 
         self.sequential_load = settings.get("sequential_load", None)
 
-        if not self.sequential_load:
+        if self.sequential_load is None:
             self.sequential_load = apply_default_mem_settings()
 
-        self.t5_model_name = "t5-v1_1-xxl"
+        self.t5_model_name = DEFAULT_MODEL_T5
         self.t5_dtype = "bfloat16" if os.getenv("IFLAB_T5_DTYPE", "float32").lower() == "bfloat16" else "float32"
-        self.stageI_model_name = settings.get("stageI_model", "IF-I-XL-v1.0")
-        self.stageII_model_name = settings.get("stageII_model", "IF-II-L-v1.0")
-        self.stageIII_model_name = settings.get("stageIII_model", "stable-diffusion-x4-upscaler")
+        self.stageI_model_name = settings.get("stageI_model", DEFAULT_MODEL_I)
+        self.stageII_model_name = settings.get("stageII_model", DEFAULT_MODEL_II)
+        self.stageIII_model_name = settings.get("stageIII_model", DEFAULT_MODEL_III)
         self.has_missing_models = False
         self.loaded = False
 
@@ -195,6 +200,12 @@ class DeepFloydIFStages:
             traceback.print_exc()
 
     def has_stageI(self):
+        current_stageI = settings.get("stageI_model", DEFAULT_MODEL_I)
+
+        if current_stageI != self.stageI_model_name:
+            self.stageI_model_name = current_stageI
+            self.unload_stageI()
+
         return not not self.if_I
 
     def downloaded_stageI(self):
@@ -238,6 +249,12 @@ class DeepFloydIFStages:
             traceback.print_exc()
 
     def has_stageII(self):
+        current_stageII = settings.get("stageII_model", DEFAULT_MODEL_II)
+
+        if current_stageII != self.stageII_model_name:
+            self.stageII_model_name = current_stageII
+            self.unload_stageII()
+
         return not not self.if_II
 
     def downloaded_stageII(self):
@@ -272,6 +289,12 @@ class DeepFloydIFStages:
         return self.if_III
 
     def has_stageIII(self):
+        current_stageIII = settings.get("stageIII_model", DEFAULT_MODEL_III)
+
+        if current_stageIII != self.stageIII_model_name:
+            self.stageIII_model_name = current_stageIII
+            self.unload_stageIII()
+
         return not not self.if_III
 
     def downloaded_stageIII(self):

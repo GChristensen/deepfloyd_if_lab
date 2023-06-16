@@ -15,6 +15,8 @@ from io import BytesIO
 from pathlib import Path
 
 import ipywidgets as widgets
+from IPython.core.display import Javascript
+from IPython.core.display_functions import display
 
 from ipywidgets import HBox, VBox, Layout
 from PIL.PngImagePlugin import PngInfo
@@ -48,6 +50,7 @@ class PipelineUI(ABC):
         self.DEFAULT_PROMPT = DEBUG_PROMPT if DEBUG else ""
         self.STAGE_I_SCALE = 2.5
         self.STOP_BUTTON_LABEL = "Stop"
+        self.WAIT_BUTTON_LABEL = "⏳Waiting..."
         self.SERIES_BUTTON_LABEL = "Batch Stage I"
         self.UPSCALE_BUTTON_LABEL = "🔬Upscale"
 
@@ -62,6 +65,7 @@ class PipelineUI(ABC):
             self.pipeline.on_checkpoints_loaded = self.on_checkpoints_loaded
 
         self.generation_thread = None
+        self.generation_finished_event = None
         self.stop_generation = False
         self.resultsI = {}
 
@@ -584,6 +588,15 @@ class PipelineUI(ABC):
 
             if parameters_json:
                 parameters = json.loads(parameters_json)
+
+                parameters_modelI = parameters.get("stageI_model", None)
+                current_modelI = self.settings.get("stageI_model", None)
+
+                if parameters_modelI and current_modelI and parameters_modelI != current_modelI:
+                    with self.output:
+                        display(Javascript(f"alert('Warning: the current stage I model {current_modelI} "
+                                            + f"differs from the stored {parameters_modelI}.')"))
+
                 self.set_ui_parameters(parameters, self.__class__.__name__ == "PNGInfoUI")
 
     @catch_handler_errors
@@ -638,15 +651,26 @@ class PipelineUI(ABC):
                 print(f"Error evaluating custom parameters: {param_str}")
 
     def setup_pipeline(self, override_args={}):
+        # to save correct PNGInfo from facade-generated images
+        def ovr(key1, key2=None):
+            if key2:
+                v1 = override_args.get(key1, None)
+                if v1:
+                    return v1.get(key2, None)
+            else:
+                return override_args.get(key1, None)
+
         self.pipeline.override_args = override_args
-        self.pipeline.aspect_ratio = self.aspect_ratio_text.value
-        self.pipeline.guidanceI = float(self.guidanceI_slider.value)
-        self.pipeline.stepsI = self.respacingI_slider.value
-        self.pipeline.guidanceII = float(self.guidanceII_slider.value)
-        self.pipeline.stepsII = self.respacingII_slider.value
-        self.pipeline.guidanceIII = float(self.guidanceIII_slider.value)
-        self.pipeline.stepsIII = self.respacingIII_slider.value
-        self.pipeline.noiseIII = self.noiseIII_slider.value
+        self.pipeline.aspect_ratio = ovr("aspect_ratio") or self.aspect_ratio_text.value
+        self.pipeline.guidanceI = ovr("if_I_kwargs", "guidance_scale") or float(self.guidanceI_slider.value)
+        self.pipeline.stepsI = ovr("if_I_kwargs", "sample_timestep_respacing") or self.respacingI_slider.value
+        self.pipeline.guidanceII = ovr("if_II_kwargs", "guidance_scale") or float(self.guidanceII_slider.value)
+        self.pipeline.stepsII = ovr("if_II_kwargs", "sample_timestep_respacing") or self.respacingII_slider.value
+        self.pipeline.guidanceIII = ovr("if_III_kwargs", "guidance_scale") or float(self.guidanceIII_slider.value)
+        self.pipeline.stepsIII = ovr("if_III_kwargs", "sample_timestep_respacing") or self.respacingIII_slider.value
+        if isinstance(self.pipeline.stepsIII, str):
+            self.pipeline.stepsIII = int(self.pipeline.stepsIII)
+        self.pipeline.noiseIII = ovr("if_III_kwargs", "noise_level") or self.noiseIII_slider.value
         self.pipeline.custom_paramsI = self.eval_custom_parameters(self.stageI_custom_params_text.value)
         self.pipeline.custom_paramsII = self.eval_custom_parameters(self.stageII_custom_params_text.value)
         self.pipeline.custom_paramsIII = self.eval_custom_parameters(self.stageIII_custom_params_text.value)
@@ -749,6 +773,12 @@ class PipelineUI(ABC):
                     self.generation_thread.start()
                 else:
                     self.generate_upscales()
+            elif self.generation_thread is not None and button.description != self.WAIT_BUTTON_LABEL:
+                self.upscale_button.description = self.WAIT_BUTTON_LABEL
+                self.upscale_button2.description = self.WAIT_BUTTON_LABEL
+                self.stop_generation = True
+                self.generation_finished_event.wait()
+                self.on_upscale_click(button)
 
     def on_before_embeddings(self):
         self.set_status_computing()
@@ -766,6 +796,7 @@ class PipelineUI(ABC):
             self.upscaling = False
             generate_seed = seed is None
 
+            self.generation_finished_event = threading.Event()
             self.stop_generation = False
             for i in range(0, steps):
                 if self.stop_generation:
@@ -788,13 +819,16 @@ class PipelineUI(ABC):
             self.status_message("Memory error. Please restart the kernel.")
         finally:
             self.reset_progress()
+
             if error:
                 self.set_status_error()
             else:
                 self.set_status_result()
-            self.generation_thread = None
             if not single:
                 button.description = self.SERIES_BUTTON_LABEL
+
+            self.generation_thread = None
+            self.generation_finished_event.set()
 
     def update_progress(self, n, p):
         try:
@@ -896,7 +930,10 @@ class PipelineUI(ABC):
         upscale_box = HBox([upscale_text, upscaleII_check, upscaleIII_check, spacer, upscale_sr_button],
                            layout=Layout(max_width=f"calc({size[0]}px + 10px)"))
 
-        result_box = VBox([top_box, image_view, upscale_box], layout=Layout(max_width=f"calc({size[0]}px + 10px)"))
+        result_box = VBox([top_box, image_view], layout=Layout(max_width=f"calc({size[0]}px + 10px)"))
+
+        if not hasattr(result, "facade"):
+            result_box.children += (upscale_box,)
 
         self.result_box.layout.display = "flex"
         self.result_button_box.layout.display = "flex"
@@ -941,6 +978,7 @@ class PipelineUI(ABC):
         error = False
 
         try:
+            self.generation_finished_event = threading.Event()
             self.upscaling = True
             generations = {}
             upscales = {}
@@ -993,11 +1031,14 @@ class PipelineUI(ABC):
             self.status_message("Memory error, please restart.")
         finally:
             self.reset_progress()
+
             if error:
                 self.set_status_error()
             else:
                 self.set_status_result()
+
             self.generation_thread = None
+            self.generation_finished_event.set()
             self.upscale_button.description = self.UPSCALE_BUTTON_LABEL
             self.upscale_button2.description = self.UPSCALE_BUTTON_LABEL
 
@@ -1069,7 +1110,7 @@ class PipelineUI(ABC):
         result_footer = HBox([spacer, generateIII_button])
 
         result_box = VBox([image_header, image_view], layout=Layout(max_width="max-content"))
-        if stage_max == "II":
+        if stage_max == "II" and not hasattr(result, "facade"):
             result_box.children += (result_footer,)
         hr = widgets.HTML("<hr class='iflab-upscale-separator'>")
 
@@ -1153,12 +1194,13 @@ class PipelineUI(ABC):
         seed = self.seed_number.value
         seed = seed if seed > 0 else None
 
-        self.setup_pipeline(kwargs)
+        self.setup_pipeline(override_args=kwargs)
         self.compute_embeddings()
         result = self.pipeline.generate(seed=seed, progress=True, is_reference=reference_pipeline)
         self.resultsI[seed] = result
 
         if update_ui:
+            setattr(result, "facade", True)
             self.process_stageI_result(result)
 
         upscale = "if_II_kwargs" in kwargs or "if_III_kwargs" in kwargs
@@ -1167,6 +1209,7 @@ class PipelineUI(ABC):
         if upscale:
             if stage == "II":
                 result = self.pipeline.upscale(resultI=result, progress=True, is_reference=reference_pipeline)
+                setattr(result, "facade", True)
                 self.upscale_resultsII[seed] = result
                 if update_ui:
                     self.process_upscale_result(seed, result, "II", "II")
@@ -1174,9 +1217,11 @@ class PipelineUI(ABC):
                 resultII = self.pipeline.upscale(resultI=result, progress=True, is_reference=reference_pipeline)
                 self.upscale_resultsII[seed] = result
                 if update_ui:
+                    setattr(resultII, "facade", True)
                     self.process_upscale_result(seed, resultII, "II", "III")
                 result = self.pipeline.upscale(resultI=result, resultII=resultII, progress=True,
                                                is_reference=reference_pipeline)
+                setattr(result, "facade", True)
                 if update_ui:
                     self.process_upscale_result(seed, result, "III", "III")
 

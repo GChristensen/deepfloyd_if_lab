@@ -10,8 +10,7 @@ class SettingsUI():
     def __init__(self, uis):
         self.uis = uis
 
-        models_label = widgets.Label(" Models (requires kernel restart)",
-                                     style=dict(background="var(--jp-layout-color2)"))
+        models_label = widgets.Label(" Models", style=dict(background="var(--jp-layout-color2)"))
 
         self.stageI_model_dropdown = widgets.Dropdown(
             options=['IF-I-XL-v1.0', 'IF-I-L-v1.0', 'IF-I-M-v1.0'],

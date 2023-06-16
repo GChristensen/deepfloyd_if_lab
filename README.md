@@ -48,6 +48,13 @@ The installation may take around an hour with an average internet connection and
    Launch the script and wait until the browser window with the notebook opens. It may be necessary to open it manually
    at http://localhost:18888/lab and manually launch the first notebook cell if it does not run automatically.
 
+### Mac
+
+Download the [install.sh](https://raw.githubusercontent.com/GChristensen/deepfloyd_if_lab/main/scripts/install.sh)
+script and run it in the directory where you want DeepFloyd IF Lab to be installed. The script will also 
+automatically install brew, python, and git.
+
+
 ## Peak VRAM Usage
 
 Peak DeepFloyd IF Lab GPU memory usage for different sets of models and memory layouts, ±1GB.

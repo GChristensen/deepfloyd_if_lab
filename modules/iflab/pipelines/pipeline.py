@@ -137,7 +137,7 @@ class Pipeline(ABC):
         for k, v in override.items():
             if (isinstance(v, dict) or isinstance(v, UserDict)) and k in args:
                 self.merge_args(args[k], v)
-            else:
+            elif v is not None:
                 args[k] = v
 
     def add_custom_parameters(self, stage_args, params):
@@ -166,7 +166,7 @@ class Pipeline(ABC):
         return self.stages.has_stageIII()
 
     def prepare_generation(self):
-        if not self.stages.has_stageI():
+        if not self.has_stageI_loaded:
             self.on_before_checkpoints_loaded(not self.stages.downloaded_stageI())
 
         self.stages.free_t5()

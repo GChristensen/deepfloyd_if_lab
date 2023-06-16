@@ -13,8 +13,7 @@ class PNGInfoUI(PipelineUI):
         self.tabs = tabs
 
     def _tune_ui(self):
-        self.upload_support_img_button.description = "Load Image"
-        self.upload_support_img_button.observe(self.load_pnginfo_image)
+        self.upload_support_img_button.layout.display = "none"
         self.send_to_label = widgets.Label("Send to:")
         self.dream_button = widgets.Button(description='Dream')
         self.dream_button.on_click(self.send_pnginfo)
@@ -31,9 +30,10 @@ class PNGInfoUI(PipelineUI):
             multiple=False,
             tooltip='Load PNG Info from image'
         )
-        self.pnginfo_button.observe(self.load_pnginfo)
+        self.pnginfo_button.observe(self.load_pnginfo_image)
+        spacer = HBox([], layout=Layout(flex="1 0 auto"))
         self.button_box.children = [self.send_to_label, self.dream_button, self.style_button, self.sr_button,
-                                    self.inpainting_button]
+                                    self.inpainting_button, spacer, self.pnginfo_button]
         self.paste_support_img_button.layout.display = "none"
         self.info_button.tooltip = "Browse PNGInfo"
 
