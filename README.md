@@ -88,6 +88,11 @@ The changelog could be found [here](https://github.com/GChristensen/deepfloyd_if
 
 ## Frequently Asked Questions
 
+>Q: How can I save the generated images?
+
+A: The images are saved automatically in the notebooks/outputs folder. On most browsers, it is possible to save the 
+generated images through the native browser context menu, available when holding SHIFT while right-clicking on the image.
+
 >Q: It prints error messages several screens long. Is it normal?
 
 A: Absolutely. DeepFloyd IF is an experimental library without a detailed user manual,
