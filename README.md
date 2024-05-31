@@ -150,37 +150,8 @@ editor user manual.
 A: The advanced options allow to pass any supported argument values to the corresponding stages in the pipeline. 
 For example, if you need to set aug_level to 0.2, specify aug_level=0.2 in one of these fields. The arguments are separated by commas.
 
->Q: I want to generate pretty anime girls with big cat ears using DeepFloyd IF, applying different character LoRAs.
-How long do I need to wait until this functionality becomes available?
-
-A: At first, it is necessary to wait until [A100s](https://en.wikipedia.org/wiki/Ampere_(microarchitecture)) will be 
-available for $100/unit in used hardware stores, so anyone can get about a dozen of them to create LoRAs for DeepFloyd IF. 
-
-Then someone should prepare a dataset of several millions of high-quality reasonably-labeled anime images without
-problems with copyright and the availability of such content. The rest is to train an anime base model that is not 
-overfitted and does things just right. Assuming that this model should be available free of charge, it is pretty
-easy to estimate the time needed to wait for its general availability.
-
->Q: I want a feature X, REST API, and a plug-in system. Will they be implemented?
-
-A: Probably, I would be able to work on this if I get enough donations to buy a new laptop with 128 GB of RAM and RTX 4090.
-This may not happen in the next 10000 years.
-
->Q: For educational purposes only, I need to generate images of routine alien reproductive activity with AZC/BZC-chromosome
-> alien individuals placed by the sides and CZC-chromosome individuals in between. Is it possible, given 
-> the superior linguistic abilities of DeepFloyd IF?
-
-A: Unfortunately, it is not possible. DeepFloyd IF was trained with some lacunas in the knowledge of such topics. Moreover, it has
-a built-in safety filter that sometimes blurs random images which it considers too hot or hateful.
-It seems, that DeepFloyd license prohibits any tinkering with this filter.
-
 >Q: How this application is licensed?
 
 A: This repository does not contain executable code derived from DeepFloyd IF and uses it as a library. 
 It is licensed under BSD. Please remember that you may use DeepFloyd IF 1.0 only for personal research 
 purposes due to its own license.
-
->Q: Wow! Your WebUI boosts my productivity fivefold. I know how it is hard to build
-> software, and how much time is required to maintain it. Where I can send you some GWEI for thanks?
-
-A: It is <a href="https://link.depay.com/AXgtLB6v1Iqx1Ufmnh7Hf">here</a>. Thank you.
